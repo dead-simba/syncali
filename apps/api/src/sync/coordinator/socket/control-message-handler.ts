@@ -23,7 +23,6 @@ import type { CoordinatorStateRepository } from "../state-repository";
 import type { DeletedEntriesPurgeResult } from "../entry/history-service";
 
 export type CoordinatorControlMessageUseCases = {
-	ackCursor(session: SocketSession, cursor: number): Promise<{ cursor: number }>;
 	detachLocalVault(session: SocketSession): Promise<void>;
 	commitMutations(
 		session: SocketSession,
@@ -289,24 +288,6 @@ export class CoordinatorControlMessageHandler {
 					requestId: parsed.requestId,
 					code: details.code,
 					message: details.message,
-				});
-			}
-			return;
-		}
-
-		if (parsed.type === "ack_cursor") {
-			try {
-				await this.useCases.ackCursor(session, parsed.cursor);
-				this.socketService.sendSocketMessage(ws, {
-					type: "cursor_acked",
-					requestId: parsed.requestId,
-					cursor: parsed.cursor,
-				});
-			} catch (error) {
-				this.socketService.sendSocketMessage(ws, {
-					type: "session_error",
-					code: "ack_failed",
-					message: error instanceof Error ? error.message : "ack failed",
 				});
 			}
 			return;

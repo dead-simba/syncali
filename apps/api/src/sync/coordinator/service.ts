@@ -101,7 +101,6 @@ export class CoordinatorService {
 			socketService,
 			stateRepository,
 			{
-				ackCursor: async (session, cursor) => await this.ackCursor(session, cursor),
 				detachLocalVault: async (session) => await this.detachLocalVault(session),
 				commitMutations: async (session, message) =>
 					await this.commitMutations(session, message),
@@ -141,10 +140,6 @@ export class CoordinatorService {
 		message: ListEntryStatesMessage,
 	): EntryStatesListedMessage {
 		return this.entrySyncService.listEntryStates(session, message);
-	}
-
-	async ackCursor(session: SocketSession, cursor: number): Promise<{ cursor: number }> {
-		return await this.entrySyncService.ackCursor(session, cursor);
 	}
 
 	async detachLocalVault(session: SocketSession): Promise<void> {

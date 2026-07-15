@@ -10,7 +10,6 @@ import {
 	uniqueId,
 } from "../../helpers/api";
 import {
-	ackCursor,
 	commitMutation,
 	listDeletedEntries,
 	listEntryVersions,
@@ -777,8 +776,6 @@ describe("sync durable object entry history integration", () => {
 				encryptedMetadata: `meta-${revision}`,
 			});
 		}
-
-		await ackCursor(stub, session, 31);
 
 		const collected = await runInDurableObject(stub, async (instance, state) => {
 			await (instance as unknown as { runGc: () => Promise<void> }).runGc();

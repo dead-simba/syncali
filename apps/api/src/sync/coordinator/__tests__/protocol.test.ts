@@ -40,25 +40,6 @@ describe("sync protocol schema", () => {
 		expect(formatClientControlMessageError(parsed.error)).toContain("lastKnownCursor");
 	});
 
-	it("accepts a cursor acknowledgement", () => {
-		const parsed = parseClientControlMessage({
-			type: "ack_cursor",
-			requestId: "request-ack",
-			cursor: 12,
-		});
-
-		expect(parsed.success).toBe(true);
-		if (!parsed.success) {
-			throw new Error("expected ack cursor message to parse");
-		}
-
-		expect(parsed.data).toEqual({
-			type: "ack_cursor",
-			requestId: "request-ack",
-			cursor: 12,
-		});
-	});
-
 	it("accepts a local vault detach request", () => {
 		const parsed = parseClientControlMessage({
 			type: "detach_local_vault",

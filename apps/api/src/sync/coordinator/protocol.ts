@@ -122,12 +122,6 @@ export const purgeDeletedEntriesMessageSchema = z.object({
 	entries: z.array(purgeDeletedEntryPayloadSchema).min(1).max(100),
 });
 
-export const ackCursorMessageSchema = z.object({
-	type: z.literal("ack_cursor"),
-	requestId: requestIdSchema,
-	cursor: nonNegativeInteger,
-});
-
 export const detachLocalVaultMessageSchema = z.object({
 	type: z.literal("detach_local_vault"),
 	requestId: requestIdSchema,
@@ -155,7 +149,6 @@ export const clientControlMessageSchema = z.discriminatedUnion("type", [
 	restoreEntryVersionMessageSchema,
 	restoreEntryVersionsMessageSchema,
 	purgeDeletedEntriesMessageSchema,
-	ackCursorMessageSchema,
 	detachLocalVaultMessageSchema,
 	heartbeatMessageSchema,
 	watchStorageStatusMessageSchema,
@@ -172,7 +165,6 @@ export type ListDeletedEntriesMessage = z.infer<typeof listDeletedEntriesMessage
 export type RestoreEntryVersionMessage = z.infer<typeof restoreEntryVersionMessageSchema>;
 export type RestoreEntryVersionsMessage = z.infer<typeof restoreEntryVersionsMessageSchema>;
 export type PurgeDeletedEntriesMessage = z.infer<typeof purgeDeletedEntriesMessageSchema>;
-export type AckCursorMessage = z.infer<typeof ackCursorMessageSchema>;
 export type DetachLocalVaultMessage = z.infer<typeof detachLocalVaultMessageSchema>;
 export type HeartbeatMessage = z.infer<typeof heartbeatMessageSchema>;
 export type WatchStorageStatusMessage = z.infer<typeof watchStorageStatusMessageSchema>;

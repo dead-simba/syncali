@@ -110,14 +110,6 @@ export class SyncCoordinator extends DurableObject {
 		return await this.coordinatorService.purgeDeletedEntries(session, message);
 	}
 
-	async ackCursor(
-		session: SocketSession,
-		cursor: number,
-	): Promise<{ cursor: number }> {
-		await this.ready;
-		return await this.coordinatorService.ackCursor(session, cursor);
-	}
-
 	async runGc(): Promise<void> {
 		await this.ready;
 		await this.coordinatorService.runGc();

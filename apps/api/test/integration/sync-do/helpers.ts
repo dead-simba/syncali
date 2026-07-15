@@ -368,21 +368,3 @@ export async function purgeDeletedEntries(
 		});
 	});
 }
-
-export async function ackCursor(
-	stub: DurableObjectStub,
-	session: SyncDoSession,
-	cursor: number,
-): Promise<void> {
-	const result = await runInDurableObject(stub, async (instance) => {
-		const coordinator = instance as unknown as {
-			ackCursor: (
-				sessionValue: SyncDoSession,
-				cursorValue: number,
-			) => Promise<{ cursor: number }>;
-		};
-		return await coordinator.ackCursor(session, cursor);
-	});
-
-	expect(result.cursor).toBe(cursor);
-}

@@ -1,5 +1,4 @@
 export type {
-	AckCursorMessage,
 	ClientControlMessage,
 	CommitMutationMessage,
 	CommitMutationPayload,
@@ -57,12 +56,6 @@ export type CommitAcceptedMessage = {
 	cursor: number;
 	entryId: string;
 	revision: number;
-};
-
-export type CursorAckedMessage = {
-	type: "cursor_acked";
-	requestId: string;
-	cursor: number;
 };
 
 export type LocalVaultDetachedMessage = {
@@ -290,7 +283,6 @@ export type ServerControlMessage =
 	| StorageStatusUpdatedMessage
 	| PolicyUpdatedMessage
 	| CommitAcceptedMessage
-	| CursorAckedMessage
 	| LocalVaultDetachedMessage
 	| HeartbeatAckMessage
 	| CommitRejectedMessage

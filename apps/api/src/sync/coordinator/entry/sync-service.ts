@@ -57,11 +57,4 @@ export class EntrySyncService {
 			})),
 		};
 	}
-
-	async ackCursor(
-		_session: SocketSession,
-		cursor: number,
-	): Promise<{ cursor: number }> {
-		return { cursor };
-	}
 }
