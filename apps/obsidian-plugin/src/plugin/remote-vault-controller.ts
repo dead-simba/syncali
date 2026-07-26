@@ -1,6 +1,6 @@
 import type { Plugin } from "obsidian";
 
-import { getSynchLocale } from "../i18n";
+import { getSynchLocale, type SynchErrorContextKey } from "../i18n";
 import { RemoteVaultManager } from "../remote-vault/manager";
 import {
   openBootstrapRemoteVaultModal,
@@ -22,7 +22,7 @@ export interface SynchRemoteVaultControllerDeps {
   initializeSyncStoreForActiveRemoteVault: () => Promise<void>;
   ensureAutoSyncState: () => Promise<void>;
   resetSyncConnection: () => Promise<void>;
-  notifyError: (error: unknown, prefix: string) => void;
+  notifyError: (error: unknown, contextKey: SynchErrorContextKey) => void;
 }
 
 export class SynchRemoteVaultController {
@@ -43,7 +43,7 @@ export class SynchRemoteVaultController {
       await this.deps.initializeSyncStoreForActiveRemoteVault();
       await this.deps.ensureAutoSyncState();
     } catch (error) {
-      this.deps.notifyError(error, "Vault creation failed");
+      this.deps.notifyError(error, "error.vaultCreation");
     }
   }
 
@@ -78,7 +78,7 @@ export class SynchRemoteVaultController {
       await this.deps.initializeSyncStoreForActiveRemoteVault();
       await this.deps.ensureAutoSyncState();
     } catch (error) {
-      this.deps.notifyError(error, "Vault connection failed");
+      this.deps.notifyError(error, "error.vaultConnection");
     }
   }
 
@@ -97,7 +97,7 @@ export class SynchRemoteVaultController {
       }
       await this.deps.remoteVaultManager.disconnectRemoteVault();
     } catch (error) {
-      this.deps.notifyError(error, "Vault disconnect failed");
+      this.deps.notifyError(error, "error.vaultDisconnect");
     } finally {
       this.deps.clearSyncTokenState();
       await this.deps.resetSyncConnection();

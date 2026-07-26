@@ -1,5 +1,6 @@
 import type { Plugin } from "obsidian";
 
+import type { SynchErrorContextKey } from "../../i18n";
 import {
   isOffline as detectOffline,
   isOfflineLikeError,
@@ -80,7 +81,7 @@ export interface SyncEngineDeps {
   getVaultConfigSyncRules: () => VaultConfigSyncRules;
   hasActiveRemoteVaultSession: () => boolean;
   notify: (message: string, timeout?: number) => void;
-  notifyError: (error: unknown, prefix: string) => void;
+  notifyError: (error: unknown, contextKey: SynchErrorContextKey) => void;
   notifySyncConflict: (event: {
     op: "upsert" | "delete";
     reason?: "local_pending_mutation" | "remote_path_collision";
@@ -208,7 +209,7 @@ export class SyncEngine {
       }
 
       this.deps.setSyncStatus("attention_needed");
-      this.deps.notifyError(error, "Auto sync failed");
+      this.deps.notifyError(error, "error.autoSync");
     },
     onRemoteVaultUnavailable: async (error) => {
       await this.deps.onRemoteVaultUnavailable?.(error);
@@ -226,7 +227,7 @@ export class SyncEngine {
     hasActiveRemoteVaultSession: () => this.deps.hasActiveRemoteVaultSession(),
     onError: (error) => {
       this.deps.setSyncStatus("attention_needed");
-      this.deps.notifyError(error, "Sync event handling failed");
+      this.deps.notifyError(error, "error.syncEventHandling");
     },
   });
   private readonly syncPullService = new SyncPullService({
@@ -525,7 +526,7 @@ export class SyncEngine {
       }
     } catch (error) {
       this.deps.setSyncStatus("attention_needed");
-      this.deps.notifyError(error, "Hidden folder scan failed");
+      this.deps.notifyError(error, "error.hiddenFolderScan");
     }
   }
 

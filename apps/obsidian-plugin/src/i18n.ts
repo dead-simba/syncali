@@ -13,6 +13,13 @@ const en = {
     "auth.signOut": "Sign out",
     "auth.showStatus": "Show auth status",
     "auth.notSignedIn": "Not signed in.",
+    "auth.approvalReceived": "Approval received. Finishing sign-in...",
+    "auth.deviceSignInCanceled": "Device sign-in canceled.",
+    "auth.deviceSignInExpired": "Device sign-in expired. Start again from Obsidian.",
+    "auth.deviceSignInFailed": ({ message }: { message: string }) => `Device sign-in failed: ${message}`,
+    "auth.deviceSignInStarting": "Device sign-in is starting...",
+    "auth.openingBrowser": ({ code }: { code: string }) => `Opening browser for device sign-in...\nCode: ${code}`,
+    "auth.signedOutDevice": "Signed out on this device.",
     cancel: "Cancel",
     close: "Close",
     connectAnyway: "Connect anyway",
@@ -91,6 +98,7 @@ const en = {
     "plugin.latestAvailable": "Update Synch from Community plugins",
     "plugin.updateRequired": "Update required",
     "plugin.updateRequiredStatus": "Plugin update required.",
+    "plugin.serverIncompatible": "This Synch server is not compatible with this plugin version. Update the server or install a compatible Synch plugin version.",
     preview: "Preview",
     "preview.loading": "Loading preview...",
     refresh: "Refresh",
@@ -105,6 +113,7 @@ const en = {
     "server.placeholder": "https://sync.example.com",
     "server.saved": "Server URL saved.",
     "server.savedCloud": "Default server selected.",
+    "server.saveFailed": ({ message }: { message: string }) => `Server settings could not be saved: ${message}`,
     "server.url": "Self-hosted server URL",
     "server.urlDesc": "Enter the URL for the Synch server you host.",
     "status.attention": "Synch needs attention. Open Synch settings",
@@ -115,6 +124,7 @@ const en = {
     "storage.full": ({ usage }: { usage: string }) => `Storage full: ${usage}`,
     "storage.label": "Storage",
     "storage.warning": ({ usage }: { usage: string }) => `Storage almost full: ${usage}`,
+    "storage.quotaExceeded": "Storage quota exceeded. Sync has been paused.",
     "subscription.canceling": ({ plan, periodEnd }: { plan: string; periodEnd: string }) =>
       `${plan}. Current period ends ${periodEnd}.`,
     "subscription.checking": "Checking subscription...",
@@ -127,8 +137,11 @@ const en = {
     "subscription.upgrade": "Upgrade",
     "sync.connectRemoteVault": "Connect a remote vault to start syncing.",
     "sync.cursorMismatch": "Sync was paused because this device's sync history no longer matches the remote vault. To resume syncing, disconnect and reconnect the remote vault in Synch settings.",
+    "sync.conflictLocalSaved": ({ path }: { path: string }) => `Sync conflict detected. Your local changes were saved to "${path}".`,
+    "sync.conflictRemoteKept": ({ path }: { path: string }) => `Sync conflict detected for "${path}". The remote version will be kept.`,
     "sync.fileSizeBlocked": ({ count }: { count: number }) => `${count} ${count === 1 ? "file exceeds" : "files exceed"} the sync size limit.`,
     "sync.label": "Sync",
+    "sync.pathCollision": ({ path }: { path: string }) => `Sync path collision detected. The remote file was saved to "${path}".`,
     "sync.paused": "Sync paused",
     "sync.start": "Start sync",
     "sync.state.attention_needed": "attention needed",
@@ -185,9 +198,13 @@ const en = {
     "vault.formatUpgradeDesc": "To use the latest remote vault version, which is faster and more storage-efficient, delete this remote vault from the vault management page, then create it again. Your local Obsidian vault files are not deleted when you remove the remote vault.",
     "vault.formatUpgradeTitle": "New vaults can sync faster and use up to 33% less storage",
     "vault.disconnected": ({ label }: { label: string }) => `Vault ${label} disconnected from this device.`,
+    "vault.connected": ({ label }: { label: string }) => `Vault ${label} connected on this device.`,
+    "vault.createdConnected": ({ label }: { label: string }) => `Vault ${label} created and connected.`,
     "vault.loaded": ({ label }: { label: string }) => `Vault ${label} loaded on this device.`,
     "vault.notActive": "A vault is stored on this device but not active.",
     "vault.notConfigured": "No vault is configured on this device.",
+    "vault.remoteAccessUnavailable": "Remote vault access is no longer available. Synch disconnected this Obsidian vault.",
+    "vault.remoteRemoved": "Remote vault was removed. Synch disconnected this Obsidian vault.",
     "vault.showStatus": "Show vault status",
     "version.beforeDelete": "Before delete",
     "version.beforeRestore": "Before restore",
@@ -202,11 +219,26 @@ const en = {
     "version.manual": "Manual",
     "version.openSyncedFile": "Open a synced file to view its history.",
     "version.previewHeader": "Version preview",
+    "version.previewFailed": ({ message }: { message: string }) => `Version preview failed: ${message}`,
     "version.restore": "Restore",
     "version.restoreConfirm": ({ capturedAt }: { capturedAt: string }) => `Restore version from ${capturedAt}?`,
     "version.restoreFailed": ({ message }: { message: string }) => `Version restore failed: ${message}`,
     "version.restored": "Version restored.",
     "version.syncFirst": "Sync first",
+    "error.detail": ({ context, message }: { context: string; message: string }) => `${context}: ${message}`,
+    "error.autoSync": "Automatic sync failed",
+    "error.autoSyncInitialization": "Automatic sync initialization failed",
+    "error.autoSyncResume": "Automatic sync could not resume",
+    "error.hiddenFolderScan": "Hidden folder scan failed",
+    "error.localSyncStateReset": "Local sync state reset failed",
+    "error.localSyncStoreInitialization": "Local sync store initialization failed",
+    "error.pluginSettingsInitialization": "Plugin settings initialization failed",
+    "error.syncEventHandling": "Sync event handling failed",
+    "error.syncFileRuleUpdate": "Sync file rule update failed",
+    "error.vaultConnection": "Vault connection failed",
+    "error.vaultCreation": "Vault creation failed",
+    "error.vaultDisconnect": "Vault disconnect failed",
+    "error.vaultRestore": "Vault restore failed",
     videos: "Videos",
 } as const;
 
@@ -418,6 +450,38 @@ const messages = {
     "version.restoreFailed": ({ message }: { message: string }) => `버전 복원 실패: ${message}`,
     "version.restored": "버전이 복원되었습니다.",
     "version.syncFirst": "먼저 동기화",
+    "auth.approvalReceived": "승인이 완료되었습니다. 로그인을 마무리하는 중...",
+    "auth.deviceSignInCanceled": "기기 로그인이 취소되었습니다.",
+    "auth.deviceSignInExpired": "기기 로그인 시간이 만료되었습니다. Obsidian에서 다시 시작하세요.",
+    "auth.deviceSignInFailed": ({ message }: { message: string }) => `기기 로그인 실패: ${message}`,
+    "auth.deviceSignInStarting": "기기 로그인을 시작하는 중...",
+    "auth.openingBrowser": ({ code }: { code: string }) => `기기 로그인을 위해 브라우저를 여는 중...\n코드: ${code}`,
+    "auth.signedOutDevice": "이 기기에서 로그아웃되었습니다.",
+    "plugin.serverIncompatible": "이 Synch 서버는 현재 플러그인 버전과 호환되지 않습니다. 서버를 업데이트하거나 호환되는 Synch 플러그인 버전을 설치하세요.",
+    "server.saveFailed": ({ message }: { message: string }) => `서버 설정을 저장하지 못했습니다: ${message}`,
+    "storage.quotaExceeded": "저장 용량을 초과하여 동기화를 일시 중지했습니다.",
+    "sync.conflictLocalSaved": ({ path }: { path: string }) => `동기화 충돌이 감지되었습니다. 로컬 변경 사항을 "${path}"에 저장했습니다.`,
+    "sync.conflictRemoteKept": ({ path }: { path: string }) => `"${path}"에서 동기화 충돌이 감지되었습니다. 원격 버전을 유지합니다.`,
+    "sync.pathCollision": ({ path }: { path: string }) => `동기화 경로 충돌이 감지되었습니다. 원격 파일을 "${path}"에 저장했습니다.`,
+    "vault.connected": ({ label }: { label: string }) => `Vault ${label}이 이 기기에 연결되었습니다.`,
+    "vault.createdConnected": ({ label }: { label: string }) => `Vault ${label}을 생성하고 연결했습니다.`,
+    "vault.remoteAccessUnavailable": "원격 vault에 더 이상 접근할 수 없어 이 Obsidian vault의 연결을 해제했습니다.",
+    "vault.remoteRemoved": "원격 vault가 삭제되어 이 Obsidian vault의 연결을 해제했습니다.",
+    "version.previewFailed": ({ message }: { message: string }) => `버전 미리보기 실패: ${message}`,
+    "error.detail": ({ context, message }: { context: string; message: string }) => `${context}: ${message}`,
+    "error.autoSync": "자동 동기화 실패",
+    "error.autoSyncInitialization": "자동 동기화 초기화 실패",
+    "error.autoSyncResume": "자동 동기화 재개 실패",
+    "error.hiddenFolderScan": "숨김 폴더 검사 실패",
+    "error.localSyncStateReset": "로컬 동기화 상태 초기화 실패",
+    "error.localSyncStoreInitialization": "로컬 동기화 저장소 초기화 실패",
+    "error.pluginSettingsInitialization": "플러그인 설정 초기화 실패",
+    "error.syncEventHandling": "동기화 이벤트 처리 실패",
+    "error.syncFileRuleUpdate": "동기화 파일 규칙 업데이트 실패",
+    "error.vaultConnection": "Vault 연결 실패",
+    "error.vaultCreation": "Vault 생성 실패",
+    "error.vaultDisconnect": "Vault 연결 해제 실패",
+    "error.vaultRestore": "Vault 복원 실패",
     videos: "동영상",
   },
   ja: {
@@ -627,6 +691,38 @@ const messages = {
     "version.restoreFailed": ({ message }: { message: string }) => `バージョンの復元に失敗しました: ${message}`,
     "version.restored": "バージョンを復元しました。",
     "version.syncFirst": "先に同期",
+    "auth.approvalReceived": "承認されました。サインインを完了しています...",
+    "auth.deviceSignInCanceled": "デバイスのサインインをキャンセルしました。",
+    "auth.deviceSignInExpired": "デバイスのサインインが期限切れになりました。Obsidianからもう一度開始してください。",
+    "auth.deviceSignInFailed": ({ message }: { message: string }) => `デバイスのサインインに失敗しました: ${message}`,
+    "auth.deviceSignInStarting": "デバイスのサインインを開始しています...",
+    "auth.openingBrowser": ({ code }: { code: string }) => `デバイスのサインイン用ブラウザーを開いています...\nコード: ${code}`,
+    "auth.signedOutDevice": "このデバイスからサインアウトしました。",
+    "plugin.serverIncompatible": "このSynchサーバーは現在のプラグインバージョンと互換性がありません。サーバーを更新するか、互換性のあるSynchプラグインをインストールしてください。",
+    "server.saveFailed": ({ message }: { message: string }) => `サーバー設定を保存できませんでした: ${message}`,
+    "storage.quotaExceeded": "ストレージ容量を超えたため、同期を一時停止しました。",
+    "sync.conflictLocalSaved": ({ path }: { path: string }) => `同期の競合を検出しました。ローカルの変更を「${path}」に保存しました。`,
+    "sync.conflictRemoteKept": ({ path }: { path: string }) => `「${path}」で同期の競合を検出しました。リモート版を保持します。`,
+    "sync.pathCollision": ({ path }: { path: string }) => `同期パスの衝突を検出しました。リモートファイルを「${path}」に保存しました。`,
+    "vault.connected": ({ label }: { label: string }) => `Vault ${label} をこのデバイスに接続しました。`,
+    "vault.createdConnected": ({ label }: { label: string }) => `Vault ${label} を作成して接続しました。`,
+    "vault.remoteAccessUnavailable": "リモートvaultにアクセスできなくなったため、このObsidian vaultを切断しました。",
+    "vault.remoteRemoved": "リモートvaultが削除されたため、このObsidian vaultを切断しました。",
+    "version.previewFailed": ({ message }: { message: string }) => `バージョンのプレビューに失敗しました: ${message}`,
+    "error.detail": ({ context, message }: { context: string; message: string }) => `${context}: ${message}`,
+    "error.autoSync": "自動同期に失敗しました",
+    "error.autoSyncInitialization": "自動同期の初期化に失敗しました",
+    "error.autoSyncResume": "自動同期を再開できませんでした",
+    "error.hiddenFolderScan": "隠しフォルダーのスキャンに失敗しました",
+    "error.localSyncStateReset": "ローカル同期状態のリセットに失敗しました",
+    "error.localSyncStoreInitialization": "ローカル同期ストアの初期化に失敗しました",
+    "error.pluginSettingsInitialization": "プラグイン設定の初期化に失敗しました",
+    "error.syncEventHandling": "同期イベントの処理に失敗しました",
+    "error.syncFileRuleUpdate": "同期ファイルルールの更新に失敗しました",
+    "error.vaultConnection": "Vaultの接続に失敗しました",
+    "error.vaultCreation": "Vaultの作成に失敗しました",
+    "error.vaultDisconnect": "Vaultの切断に失敗しました",
+    "error.vaultRestore": "Vaultの復元に失敗しました",
     videos: "動画",
   },
   "zh-cn": {
@@ -836,6 +932,38 @@ const messages = {
     "version.restoreFailed": ({ message }: { message: string }) => `版本恢复失败：${message}`,
     "version.restored": "版本已恢复。",
     "version.syncFirst": "先同步",
+    "auth.approvalReceived": "已获得批准。正在完成登录...",
+    "auth.deviceSignInCanceled": "已取消设备登录。",
+    "auth.deviceSignInExpired": "设备登录已过期。请从 Obsidian 重新开始。",
+    "auth.deviceSignInFailed": ({ message }: { message: string }) => `设备登录失败：${message}`,
+    "auth.deviceSignInStarting": "正在开始设备登录...",
+    "auth.openingBrowser": ({ code }: { code: string }) => `正在打开浏览器进行设备登录...\n代码：${code}`,
+    "auth.signedOutDevice": "已在此设备上退出登录。",
+    "plugin.serverIncompatible": "此 Synch 服务器与当前插件版本不兼容。请更新服务器或安装兼容的 Synch 插件版本。",
+    "server.saveFailed": ({ message }: { message: string }) => `无法保存服务器设置：${message}`,
+    "storage.quotaExceeded": "已超出存储配额。同步已暂停。",
+    "sync.conflictLocalSaved": ({ path }: { path: string }) => `检测到同步冲突。你的本地更改已保存到“${path}”。`,
+    "sync.conflictRemoteKept": ({ path }: { path: string }) => `检测到“${path}”的同步冲突。将保留远程版本。`,
+    "sync.pathCollision": ({ path }: { path: string }) => `检测到同步路径冲突。远程文件已保存到“${path}”。`,
+    "vault.connected": ({ label }: { label: string }) => `Vault ${label} 已连接到此设备。`,
+    "vault.createdConnected": ({ label }: { label: string }) => `Vault ${label} 已创建并连接。`,
+    "vault.remoteAccessUnavailable": "远程 vault 已无法访问。Synch 已断开此 Obsidian vault。",
+    "vault.remoteRemoved": "远程 vault 已被删除。Synch 已断开此 Obsidian vault。",
+    "version.previewFailed": ({ message }: { message: string }) => `版本预览失败：${message}`,
+    "error.detail": ({ context, message }: { context: string; message: string }) => `${context}：${message}`,
+    "error.autoSync": "自动同步失败",
+    "error.autoSyncInitialization": "自动同步初始化失败",
+    "error.autoSyncResume": "无法恢复自动同步",
+    "error.hiddenFolderScan": "隐藏文件夹扫描失败",
+    "error.localSyncStateReset": "本地同步状态重置失败",
+    "error.localSyncStoreInitialization": "本地同步存储初始化失败",
+    "error.pluginSettingsInitialization": "插件设置初始化失败",
+    "error.syncEventHandling": "同步事件处理失败",
+    "error.syncFileRuleUpdate": "同步文件规则更新失败",
+    "error.vaultConnection": "Vault 连接失败",
+    "error.vaultCreation": "Vault 创建失败",
+    "error.vaultDisconnect": "Vault 断开连接失败",
+    "error.vaultRestore": "Vault 恢复失败",
     videos: "视频",
   },
   "zh-tw": {
@@ -1045,12 +1173,58 @@ const messages = {
     "version.restoreFailed": ({ message }: { message: string }) => `版本還原失敗：${message}`,
     "version.restored": "版本已還原。",
     "version.syncFirst": "先同步",
+    "auth.approvalReceived": "已獲得核准。正在完成登入...",
+    "auth.deviceSignInCanceled": "已取消裝置登入。",
+    "auth.deviceSignInExpired": "裝置登入已過期。請從 Obsidian 重新開始。",
+    "auth.deviceSignInFailed": ({ message }: { message: string }) => `裝置登入失敗：${message}`,
+    "auth.deviceSignInStarting": "正在開始裝置登入...",
+    "auth.openingBrowser": ({ code }: { code: string }) => `正在開啟瀏覽器進行裝置登入...\n代碼：${code}`,
+    "auth.signedOutDevice": "已在此裝置上登出。",
+    "plugin.serverIncompatible": "此 Synch 伺服器與目前的外掛程式版本不相容。請更新伺服器或安裝相容的 Synch 外掛程式版本。",
+    "server.saveFailed": ({ message }: { message: string }) => `無法儲存伺服器設定：${message}`,
+    "storage.quotaExceeded": "已超出儲存空間配額。同步已暫停。",
+    "sync.conflictLocalSaved": ({ path }: { path: string }) => `偵測到同步衝突。你的本機變更已儲存至「${path}」。`,
+    "sync.conflictRemoteKept": ({ path }: { path: string }) => `偵測到「${path}」的同步衝突。將保留遠端版本。`,
+    "sync.pathCollision": ({ path }: { path: string }) => `偵測到同步路徑衝突。遠端檔案已儲存至「${path}」。`,
+    "vault.connected": ({ label }: { label: string }) => `Vault ${label} 已連接到此裝置。`,
+    "vault.createdConnected": ({ label }: { label: string }) => `Vault ${label} 已建立並連接。`,
+    "vault.remoteAccessUnavailable": "遠端 vault 已無法存取。Synch 已中斷此 Obsidian vault。",
+    "vault.remoteRemoved": "遠端 vault 已被刪除。Synch 已中斷此 Obsidian vault。",
+    "version.previewFailed": ({ message }: { message: string }) => `版本預覽失敗：${message}`,
+    "error.detail": ({ context, message }: { context: string; message: string }) => `${context}：${message}`,
+    "error.autoSync": "自動同步失敗",
+    "error.autoSyncInitialization": "自動同步初始化失敗",
+    "error.autoSyncResume": "無法繼續自動同步",
+    "error.hiddenFolderScan": "隱藏資料夾掃描失敗",
+    "error.localSyncStateReset": "本機同步狀態重設失敗",
+    "error.localSyncStoreInitialization": "本機同步儲存初始化失敗",
+    "error.pluginSettingsInitialization": "外掛程式設定初始化失敗",
+    "error.syncEventHandling": "同步事件處理失敗",
+    "error.syncFileRuleUpdate": "同步檔案規則更新失敗",
+    "error.vaultConnection": "Vault 連接失敗",
+    "error.vaultCreation": "Vault 建立失敗",
+    "error.vaultDisconnect": "Vault 中斷連接失敗",
+    "error.vaultRestore": "Vault 還原失敗",
     videos: "影片",
   },
 } as const;
 
 export type SynchLocale = keyof typeof messages;
 export type SynchMessageKey = keyof typeof messages.en;
+export type SynchErrorContextKey =
+  | "error.autoSync"
+  | "error.autoSyncInitialization"
+  | "error.autoSyncResume"
+  | "error.hiddenFolderScan"
+  | "error.localSyncStateReset"
+  | "error.localSyncStoreInitialization"
+  | "error.pluginSettingsInitialization"
+  | "error.syncEventHandling"
+  | "error.syncFileRuleUpdate"
+  | "error.vaultConnection"
+  | "error.vaultCreation"
+  | "error.vaultDisconnect"
+  | "error.vaultRestore";
 
 export function getSynchLocale(): SynchLocale {
   const language = getLanguage().toLowerCase();
@@ -1075,7 +1249,10 @@ export function t<K extends SynchMessageKey>(
   return value;
 }
 
-export function formatErrorNotice(error: unknown, prefix: string): string {
+export function formatErrorNotice(
+  error: unknown,
+  contextKey: SynchErrorContextKey,
+): string {
   if (
     error &&
     typeof error === "object" &&
@@ -1086,7 +1263,7 @@ export function formatErrorNotice(error: unknown, prefix: string): string {
   }
 
   const message = error instanceof Error ? error.message : String(error);
-  return `${prefix}: ${message}`;
+  return t("error.detail", { context: t(contextKey), message });
 }
 
 export function formatVaultPasswordValidationError(

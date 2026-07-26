@@ -109,7 +109,7 @@ describe("SynchPluginController sync enabled setting", () => {
     expect(controller.getSyncState()).toBe("update_required");
     expect(controller.getSyncStatusLabel()).toBe("Plugin update required.");
     expect(getNotices()).toContainEqual({
-      message: "Update Synch before syncing.",
+      message: "Update Synch from Community plugins",
       timeout: 0,
     });
 
@@ -120,13 +120,17 @@ describe("SynchPluginController sync enabled setting", () => {
       state: "update_required",
       currentVersion: "0.0.1",
       minVersion: "1.2.0",
-      message: "Update Synch before syncing.",
+      message: "Update Synch from Community plugins",
     });
     expect(ensureAutoSyncState).not.toHaveBeenCalled();
     expect(stopAutoSyncAndMarkNotReady).toHaveBeenCalled();
     expect(controller.isSyncEnabled()).toBe(false);
     expect(refreshUi).toHaveBeenCalled();
-    expect(getNotices().filter((notice) => notice.message === "Update Synch before syncing."))
+    expect(
+      getNotices().filter(
+        (notice) => notice.message === "Update Synch from Community plugins",
+      ),
+    )
       .toHaveLength(2);
   });
 

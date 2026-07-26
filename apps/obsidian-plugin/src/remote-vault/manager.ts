@@ -157,7 +157,7 @@ export class RemoteVaultManager {
     await this.loadBootstrapRemoteVaultSession(bootstrap, input.password);
 
     const summary = this.requireSession().summary;
-    this.notify(`Vault ${summary.vaultName} created and connected.`);
+    this.notify(t("vault.createdConnected", { label: summary.vaultName }));
     return summary;
   }
 
@@ -182,7 +182,7 @@ export class RemoteVaultManager {
     await this.loadBootstrapRemoteVaultSession(bootstrap, password);
 
     const summary = this.requireSession().summary;
-    this.notify(`Vault ${summary.vaultName} connected on this device.`);
+    this.notify(t("vault.connected", { label: summary.vaultName }));
     return summary;
   }
 

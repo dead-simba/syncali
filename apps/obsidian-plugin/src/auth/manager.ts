@@ -178,9 +178,9 @@ export class AuthManager {
         );
 
         if (poll.status === "approved") {
-          this.notify("Approval received. Finishing sign-in...");
+          this.notify(t("auth.approvalReceived"));
           await this.completeDeviceLogin(poll);
-          this.notify(`Signed in: ${this.getAuthStatusLabel()}`);
+          this.notify(this.getAuthStatusLabel());
           return true;
         }
 
@@ -189,20 +189,20 @@ export class AuthManager {
           continue;
         }
 
-        this.notify(`Device sign-in failed: ${poll.message}`);
+        this.notify(t("auth.deviceSignInFailed", { message: poll.message }));
         return true;
       }
 
       if (cancelled) {
-        this.notify("Device sign-in canceled.");
+        this.notify(t("auth.deviceSignInCanceled"));
         return true;
       }
 
-      this.notify("Device sign-in expired. Start again from Obsidian.");
+      this.notify(t("auth.deviceSignInExpired"));
       return true;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      this.notify(`Device sign-in failed: ${message}`);
+      this.notify(t("auth.deviceSignInFailed", { message }));
       return true;
     } finally {
       this.deviceLoginInFlight = false;
@@ -230,7 +230,7 @@ export class AuthManager {
       this.deps.refreshUi();
     }
 
-    this.notify("Signed out on this device.");
+    this.notify(t("auth.signedOutDevice"));
   }
 
   private async completeDeviceLogin(
@@ -261,7 +261,7 @@ export class AuthManager {
 
   private reopenDeviceLogin(): void {
     if (!this.deviceAuthorization) {
-      this.notify("Device sign-in is starting...");
+      this.notify(t("auth.deviceSignInStarting"));
       return;
     }
 
@@ -269,9 +269,7 @@ export class AuthManager {
   }
 
   private openDeviceLogin(authorization: DeviceAuthorizationStart): void {
-    this.notify(
-      `Opening browser for device sign-in...\nCode: ${authorization.userCode}`,
-    );
+    this.notify(t("auth.openingBrowser", { code: authorization.userCode }));
     this.openExternalUrl(
       withDeviceLoginLocale(authorization.verificationUriComplete),
     );

@@ -37,11 +37,22 @@ describe("Synch i18n", () => {
     );
   });
 
-  it("keeps the existing fallback for other errors", () => {
+  it("localizes the context for other errors", () => {
     setLanguage("ko-KR");
 
-    expect(formatErrorNotice(new Error("request failed"), "Auto sync failed")).toBe(
-      "Auto sync failed: request failed",
+    expect(formatErrorNotice(new Error("request failed"), "error.autoSync")).toBe(
+      "자동 동기화 실패: request failed",
+    );
+  });
+
+  it("localizes notification messages with dynamic values", () => {
+    setLanguage("ko-KR");
+
+    expect(t("auth.openingBrowser", { code: "ABCD-EFGH" })).toBe(
+      "기기 로그인을 위해 브라우저를 여는 중...\n코드: ABCD-EFGH",
+    );
+    expect(t("sync.conflictLocalSaved", { path: "메모/충돌.md" })).toBe(
+      '동기화 충돌이 감지되었습니다. 로컬 변경 사항을 "메모/충돌.md"에 저장했습니다.',
     );
   });
 

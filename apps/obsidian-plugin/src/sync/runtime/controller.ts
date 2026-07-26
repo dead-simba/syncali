@@ -1,5 +1,6 @@
 import { Notice, type Plugin } from "obsidian";
 
+import { t, type SynchErrorContextKey } from "../../i18n";
 import {
   isOffline as detectOffline,
   isOfflineLikeError,
@@ -51,7 +52,7 @@ export interface SyncControllerDeps {
   hasActiveRemoteVaultSession: () => boolean;
   hasConnectedRemoteVault: () => boolean;
   hasAuthenticatedSession: () => boolean;
-  notifyError: (error: unknown, prefix: string) => void;
+  notifyError: (error: unknown, contextKey: SynchErrorContextKey) => void;
   notify?: (message: string, timeout?: number) => void;
   onSyncStatusChange?: () => void;
   onStorageStatusChange?: () => void;
@@ -111,7 +112,7 @@ export class SyncController {
       await this.syncEngine.refreshSyncProgress();
     } catch (error) {
       this.setSyncStatus("attention_needed");
-      this.deps.notifyError(error, "Local sync store initialization failed");
+      this.deps.notifyError(error, "error.localSyncStoreInitialization");
       throw error;
     }
   }
@@ -252,7 +253,7 @@ export class SyncController {
       }
 
       this.setSyncStatus("attention_needed");
-      this.deps.notifyError(error, "Auto sync initialization failed");
+      this.deps.notifyError(error, "error.autoSyncInitialization");
     }
   }
 
@@ -303,7 +304,7 @@ export class SyncController {
       }
 
       this.setSyncStatus("attention_needed");
-      this.deps.notifyError(error, "Sync file rule update failed");
+      this.deps.notifyError(error, "error.syncFileRuleUpdate");
     }
   }
 
@@ -461,20 +462,20 @@ export class SyncController {
   }): void {
     if (event.reason === "remote_path_collision" && event.conflictPath) {
       this.notify(
-        `Sync path collision detected. The remote file was saved to "${event.conflictPath}".`,
+        t("sync.pathCollision", { path: event.conflictPath }),
       );
       return;
     }
 
     if (event.op === "upsert" && event.conflictPath) {
       this.notify(
-        `Sync conflict detected. Your local changes were saved to "${event.conflictPath}".`,
+        t("sync.conflictLocalSaved", { path: event.conflictPath }),
       );
       return;
     }
 
     this.notify(
-      `Sync conflict detected for "${event.originalPath}". The remote version will be kept.`,
+      t("sync.conflictRemoteKept", { path: event.originalPath }),
     );
   }
 

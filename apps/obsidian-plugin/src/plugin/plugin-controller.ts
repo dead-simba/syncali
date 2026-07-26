@@ -4,7 +4,12 @@ import { BillingClient } from "../billing/client";
 import { buildBillingWebPageUrl } from "../billing/web-url";
 import { getDefaultApiBaseUrl } from "../config";
 import { isOfflineLikeError } from "../http/network-status";
-import { formatErrorNotice, getSynchLocale, t } from "../i18n";
+import {
+  formatErrorNotice,
+  getSynchLocale,
+  t,
+  type SynchErrorContextKey,
+} from "../i18n";
 import { AuthManager, type AuthReadiness } from "../auth/manager";
 import { SynchPluginDataStore } from "../plugin-data";
 import type { SynchSettingsController } from "../settings/controller";
@@ -133,8 +138,8 @@ export class SynchPluginController implements SynchSettingsController {
     hasActiveRemoteVaultSession: () => this.hasActiveRemoteVaultSession(),
     hasConnectedRemoteVault: () => this.hasConnectedRemoteVault(),
     hasAuthenticatedSession: () => this.hasAuthenticatedSession(),
-    notifyError: (error, prefix) => {
-      this.notifyError(error, prefix);
+    notifyError: (error, contextKey) => {
+      this.notifyError(error, contextKey);
     },
     notify: (message, timeout) => {
       new Notice(message, timeout);
@@ -150,7 +155,7 @@ export class SynchPluginController implements SynchSettingsController {
     },
     onStorageQuotaExceeded: async () => {
       await this.setSyncEnabled(false);
-      new Notice("Storage quota exceeded. Sync has been paused.");
+      new Notice(t("storage.quotaExceeded"));
     },
     onRemoteVaultUnavailable: async (error) => {
       await this.disconnectUnavailableRemoteVault(error);
@@ -184,8 +189,8 @@ export class SynchPluginController implements SynchSettingsController {
     resetSyncConnection: async () => {
       await this.resetSyncConnection();
     },
-    notifyError: (error, prefix) => {
-      this.notifyError(error, prefix);
+    notifyError: (error, contextKey) => {
+      this.notifyError(error, contextKey);
     },
   });
 
@@ -225,7 +230,7 @@ export class SynchPluginController implements SynchSettingsController {
 
     this.resumeAutoSyncPromise = this.resumeAutoSyncWhenPossible()
       .catch((error) => {
-        this.notifyUnlessOffline(error, "Auto sync resume failed");
+        this.notifyUnlessOffline(error, "error.autoSyncResume");
       })
       .finally(() => {
         this.resumeAutoSyncPromise = null;
@@ -748,7 +753,7 @@ export class SynchPluginController implements SynchSettingsController {
     try {
       hasActiveRemoteVaultStore = await this.ensureActiveRemoteVaultStore();
     } catch (error) {
-      this.notifyUnlessOffline(error, "Vault restore failed");
+      this.notifyUnlessOffline(error, "error.vaultRestore");
       return;
     }
 
@@ -790,7 +795,10 @@ export class SynchPluginController implements SynchSettingsController {
     return this.hasActiveRemoteVaultSession();
   }
 
-  private notifyUnlessOffline(error: unknown, prefix: string): void {
+  private notifyUnlessOffline(
+    error: unknown,
+    contextKey: SynchErrorContextKey,
+  ): void {
     if (isRemoteVaultUnavailableError(error)) {
       void this.disconnectUnavailableRemoteVault(error);
       return;
@@ -802,7 +810,7 @@ export class SynchPluginController implements SynchSettingsController {
     }
 
     this.syncController.markAttentionNeeded();
-    this.notifyError(error, prefix);
+    this.notifyError(error, contextKey);
   }
 
   private async initializeSyncStoreForActiveRemoteVault(): Promise<void> {
@@ -821,7 +829,7 @@ export class SynchPluginController implements SynchSettingsController {
       await this.syncController.resetLocalSyncState();
       this.storedSyncConnection = null;
     } catch (error) {
-      this.notifyError(error, "Local sync state reset failed");
+      this.notifyError(error, "error.localSyncStateReset");
       this.syncController.stopAutoSyncAndMarkNotReady();
     }
   }
@@ -860,13 +868,13 @@ export class SynchPluginController implements SynchSettingsController {
 
     const message =
       error.reason === "not_found"
-        ? "Remote vault was removed. Synch disconnected this Obsidian vault."
-        : "Remote vault access is no longer available. Synch disconnected this Obsidian vault.";
+        ? t("vault.remoteRemoved")
+        : t("vault.remoteAccessUnavailable");
     new Notice(message);
   }
 
-  private notifyError(error: unknown, prefix: string): void {
-    new Notice(formatErrorNotice(error, prefix));
+  private notifyError(error: unknown, contextKey: SynchErrorContextKey): void {
+    new Notice(formatErrorNotice(error, contextKey));
   }
 
   private async checkServerPluginVersion(): Promise<void> {
@@ -880,8 +888,7 @@ export class SynchPluginController implements SynchSettingsController {
           state: "update_required",
           currentVersion: this.plugin.manifest.version,
           minVersion: status.minVersion,
-          message:
-            "This Synch server is not compatible with this plugin version. Update the server or install a compatible Synch plugin version.",
+          message: t("plugin.serverIncompatible"),
         };
         this.syncController.stopAutoSyncAndMarkNotReady();
         new Notice(this.getPluginUpdateRequiredMessage(), 0);
@@ -897,7 +904,7 @@ export class SynchPluginController implements SynchSettingsController {
         state: "update_required",
         currentVersion: this.plugin.manifest.version,
         minVersion: status.minVersion,
-        message: status.message,
+        message: t("plugin.latestAvailable"),
       };
       this.syncController.stopAutoSyncAndMarkNotReady();
       new Notice(this.getPluginUpdateRequiredMessage(), 0);
@@ -913,7 +920,7 @@ export class SynchPluginController implements SynchSettingsController {
 
   private getPluginUpdateRequiredMessage(): string {
     if (this.pluginUpdateStatus.state !== "update_required") {
-      return "Synch plugin update is required.";
+      return t("plugin.updateRequiredStatus");
     }
 
     return this.pluginUpdateStatus.message;
@@ -932,7 +939,7 @@ export class SynchPluginController implements SynchSettingsController {
     try {
       this.settingsStore.initialize();
     } catch (error) {
-      this.notifyError(error, "Plugin settings initialization failed");
+      this.notifyError(error, "error.pluginSettingsInitialization");
     }
   }
 

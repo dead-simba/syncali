@@ -102,7 +102,7 @@ export function renderApiBaseUrlSetting(
             options.onShowSelfHostedServerUrlChange(false);
           } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
-            new Notice(message);
+            new Notice(t("server.saveFailed", { message }));
           }
         }),
     );
@@ -136,7 +136,7 @@ export function renderApiBaseUrlSetting(
             );
           } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
-            new Notice(message);
+            new Notice(t("server.saveFailed", { message }));
           }
         }),
     );

@@ -212,7 +212,11 @@ describe("SynchSettingTab", () => {
     await getButtonComponents()[1]?.click();
 
     expect(getNotices()).toEqual([
-      { message: "API base URL must be a valid http:// or https:// URL." },
+      {
+        message:
+          "Server settings could not be saved: API base URL must be a valid http:// or https:// URL.",
+        timeout: undefined,
+      },
     ]);
   });
 

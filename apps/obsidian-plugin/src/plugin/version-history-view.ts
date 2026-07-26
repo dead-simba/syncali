@@ -263,7 +263,9 @@ export class SynchVersionHistoryView extends ItemView {
       new VersionPreviewModal(this.app, preview).open();
     } catch (error) {
       new Notice(
-        `Version preview failed: ${error instanceof Error ? error.message : String(error)}`,
+        t("version.previewFailed", {
+          message: error instanceof Error ? error.message : String(error),
+        }),
       );
     }
   }
