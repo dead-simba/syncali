@@ -126,6 +126,7 @@ const en = {
     "subscription.starterPlan": "Sync Starter",
     "subscription.upgrade": "Upgrade",
     "sync.connectRemoteVault": "Connect a remote vault to start syncing.",
+    "sync.cursorMismatch": "Sync was paused because this device's sync history no longer matches the remote vault. To resume syncing, disconnect and reconnect the remote vault in Synch settings.",
     "sync.fileSizeBlocked": ({ count }: { count: number }) => `${count} ${count === 1 ? "file exceeds" : "files exceed"} the sync size limit.`,
     "sync.label": "Sync",
     "sync.paused": "Sync paused",
@@ -336,6 +337,7 @@ const messages = {
     "subscription.starterPlan": "Sync Starter",
     "subscription.upgrade": "업그레이드",
     "sync.connectRemoteVault": "동기화를 시작하려면 원격 vault에 연결하세요.",
+    "sync.cursorMismatch": "이 기기의 동기화 기록이 원격 vault와 일치하지 않아 동기화를 중지했습니다. 다시 동기화하려면 Synch 설정에서 원격 vault의 연결을 해제한 후 다시 연결하세요.",
     "sync.fileSizeBlocked": ({ count }: { count: number }) => `${count}개 파일이 동기화 크기 제한을 초과했습니다.`,
     "sync.label": "동기화",
     "sync.paused": "동기화 일시 중지됨",
@@ -544,6 +546,7 @@ const messages = {
     "subscription.starterPlan": "Sync Starter",
     "subscription.upgrade": "アップグレード",
     "sync.connectRemoteVault": "同期を開始するにはリモートvaultに接続してください。",
+    "sync.cursorMismatch": "このデバイスの同期履歴がリモートvaultと一致しないため、同期を停止しました。同期を再開するには、Synch設定でリモートvaultの接続を解除してから再接続してください。",
     "sync.fileSizeBlocked": ({ count }: { count: number }) => `${count}件のファイルが同期サイズ制限を超えています。`,
     "sync.label": "同期",
     "sync.paused": "同期は一時停止中",
@@ -752,6 +755,7 @@ const messages = {
     "subscription.starterPlan": "Sync Starter",
     "subscription.upgrade": "升级",
     "sync.connectRemoteVault": "连接远程 vault 以开始同步。",
+    "sync.cursorMismatch": "由于此设备的同步记录与远程 vault 不再一致，同步已暂停。要恢复同步，请在 Synch 设置中断开并重新连接远程 vault。",
     "sync.fileSizeBlocked": ({ count }: { count: number }) => `${count} 个文件超出同步大小限制。`,
     "sync.label": "同步",
     "sync.paused": "同步已暂停",
@@ -960,6 +964,7 @@ const messages = {
     "subscription.starterPlan": "Sync Starter",
     "subscription.upgrade": "升級",
     "sync.connectRemoteVault": "連接遠端 vault 以開始同步。",
+    "sync.cursorMismatch": "由於此裝置的同步記錄與遠端 vault 不再一致，同步已暫停。若要恢復同步，請在 Synch 設定中中斷並重新連接遠端 vault。",
     "sync.fileSizeBlocked": ({ count }: { count: number }) => `${count} 個檔案超出同步大小限制。`,
     "sync.label": "同步",
     "sync.paused": "同步已暫停",
@@ -1068,6 +1073,20 @@ export function t<K extends SynchMessageKey>(
     return value(params as never);
   }
   return value;
+}
+
+export function formatErrorNotice(error: unknown, prefix: string): string {
+  if (
+    error &&
+    typeof error === "object" &&
+    "code" in error &&
+    error.code === "cursor_ahead_of_server"
+  ) {
+    return t("sync.cursorMismatch");
+  }
+
+  const message = error instanceof Error ? error.message : String(error);
+  return `${prefix}: ${message}`;
 }
 
 export function formatVaultPasswordValidationError(

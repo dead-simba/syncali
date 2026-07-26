@@ -15,10 +15,12 @@ export class EntrySyncService {
 		message: ListEntryStatesMessage,
 	): EntryStatesListedMessage {
 		const effectiveLimit = Math.min(message.limit, MAX_ENTRY_STATE_BATCH);
+		const currentCursor = this.stateRepository.currentCursor();
 		const targetCursor =
 			message.targetCursor === null
-				? this.stateRepository.currentCursor()
+				? currentCursor
 				: message.targetCursor;
+		validateCursorRange(message, targetCursor, currentCursor);
 		const entries = this.stateRepository.listEntryStates(
 			message.sinceCursor,
 			targetCursor,
@@ -56,5 +58,46 @@ export class EntrySyncService {
 				updatedAt: entry.updated_at,
 			})),
 		};
+	}
+}
+
+function validateCursorRange(
+	message: ListEntryStatesMessage,
+	targetCursor: number,
+	currentCursor: number,
+): void {
+	if (message.sinceCursor > currentCursor) {
+		throw new EntrySyncRequestError(
+			"cursor_ahead_of_server",
+			"Sync was paused because this device's sync history no longer matches the remote vault. To resume syncing, disconnect and reconnect the remote vault in Synch settings.",
+		);
+	}
+
+	if (targetCursor < message.sinceCursor || targetCursor > currentCursor) {
+		throw new EntrySyncRequestError(
+			"invalid_cursor_range",
+			`Entry-state cursor range must satisfy sinceCursor <= targetCursor <= currentCursor (${message.sinceCursor} <= ${targetCursor} <= ${currentCursor}).`,
+		);
+	}
+
+	if (
+		message.after !== null &&
+		(message.after.updatedSeq <= message.sinceCursor ||
+			message.after.updatedSeq > targetCursor)
+	) {
+		throw new EntrySyncRequestError(
+			"invalid_cursor_range",
+			`Entry-state page cursor ${message.after.updatedSeq} must be within (${message.sinceCursor}, ${targetCursor}].`,
+		);
+	}
+}
+
+class EntrySyncRequestError extends Error {
+	constructor(
+		readonly code: "cursor_ahead_of_server" | "invalid_cursor_range",
+		message: string,
+	) {
+		super(message);
+		this.name = "EntrySyncRequestError";
 	}
 }

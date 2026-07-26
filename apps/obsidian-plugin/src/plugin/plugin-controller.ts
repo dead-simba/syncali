@@ -4,7 +4,7 @@ import { BillingClient } from "../billing/client";
 import { buildBillingWebPageUrl } from "../billing/web-url";
 import { getDefaultApiBaseUrl } from "../config";
 import { isOfflineLikeError } from "../http/network-status";
-import { getSynchLocale, t } from "../i18n";
+import { formatErrorNotice, getSynchLocale, t } from "../i18n";
 import { AuthManager, type AuthReadiness } from "../auth/manager";
 import { SynchPluginDataStore } from "../plugin-data";
 import type { SynchSettingsController } from "../settings/controller";
@@ -866,8 +866,7 @@ export class SynchPluginController implements SynchSettingsController {
   }
 
   private notifyError(error: unknown, prefix: string): void {
-    const message = error instanceof Error ? error.message : String(error);
-    new Notice(`${prefix}: ${message}`);
+    new Notice(formatErrorNotice(error, prefix));
   }
 
   private async checkServerPluginVersion(): Promise<void> {

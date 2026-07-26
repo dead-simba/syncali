@@ -8,6 +8,7 @@ import type { PushPendingMutationsResult } from "./push-service";
 import {
   SyncRealtimeClient,
   SyncRealtimeConnectionError,
+  SyncRealtimeError,
   type SyncRealtimeSession,
   type SyncStorageStatus,
 } from "../remote/realtime-client";
@@ -206,7 +207,10 @@ export class SyncAutoLoop {
             this.markRealtimeDisconnected();
           },
           onError: (error) => {
-            if (!isRealtimeConnectionError(error)) {
+            if (
+              !isRealtimeConnectionError(error) &&
+              !isCursorAheadOfServerError(error)
+            ) {
               this.handleError(error);
             }
           },
@@ -219,6 +223,12 @@ export class SyncAutoLoop {
 
       this.realtimeSession = session;
       try {
+        if (cursor > session.serverCursor) {
+          throw new SyncRealtimeError(
+            "cursor_ahead_of_server",
+            "Sync was paused because this device's sync history no longer matches the remote vault. To resume syncing, disconnect and reconnect the remote vault in Synch settings.",
+          );
+        }
         this.reconnectAttempt = 0;
         if (this.storageStatusWatching) {
           this.applyStorageStatusWatch();
@@ -247,6 +257,12 @@ export class SyncAutoLoop {
         throw error;
       }
     } catch (error) {
+      if (isCursorAheadOfServerError(error)) {
+        this.stop();
+        this.handleError(error);
+        return;
+      }
+
       if (isRemoteVaultUnavailableError(error)) {
         this.handleRemoteVaultUnavailable(error);
         return;
@@ -432,6 +448,12 @@ export class SyncAutoLoop {
         }
         this.resetSyncRetry();
       } catch (error) {
+        if (isCursorAheadOfServerError(error)) {
+          this.stop();
+          this.handleError(error);
+          return;
+        }
+
         if (isRemoteVaultUnavailableError(error)) {
           this.handleRemoteVaultUnavailable(error);
           return;
@@ -509,4 +531,10 @@ export class SyncAutoLoop {
 
 function isRealtimeConnectionError(error: unknown): boolean {
   return error instanceof SyncRealtimeConnectionError;
+}
+
+function isCursorAheadOfServerError(error: unknown): boolean {
+  return (
+    error instanceof SyncRealtimeError && error.code === "cursor_ahead_of_server"
+  );
 }

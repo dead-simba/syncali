@@ -334,6 +334,30 @@ describe("coordinator websocket control messages", () => {
 		);
 	});
 
+	it("rejects a hello cursor that is ahead of the server cursor", async () => {
+		const sender = testWebSocket();
+		const stateRepository = socketStateRepository();
+		const socketService = socketServiceMock();
+		const service = createCoordinatorService({ stateRepository, socketService });
+
+		await service.handleSocketMessage(
+			sender,
+			JSON.stringify({
+				type: "hello",
+				requestId: "request-hello",
+				lastKnownCursor: 12,
+			}),
+		);
+
+		expect(socketService.sendSocketMessage).toHaveBeenCalledWith(sender, {
+			type: "session_error",
+			code: "cursor_ahead_of_server",
+			message:
+				"Sync was paused because this device's sync history no longer matches the remote vault. To resume syncing, disconnect and reconnect the remote vault in Synch settings.",
+		});
+		expect(stateRepository.recordLocalVaultConnection).not.toHaveBeenCalled();
+	});
+
 	it("acknowledges heartbeat messages", async () => {
 		const sender = testWebSocket();
 		const stateRepository = socketStateRepository();

@@ -67,4 +67,60 @@ describe("coordinator entry-state sync", () => {
 			],
 		});
 	});
+
+	it.each([
+		{
+			name: "since cursor ahead of the server",
+			sinceCursor: 11,
+			targetCursor: null,
+			code: "cursor_ahead_of_server",
+		},
+		{
+			name: "target cursor ahead of the server",
+			sinceCursor: 2,
+			targetCursor: 11,
+			code: "invalid_cursor_range",
+		},
+		{
+			name: "target cursor behind the since cursor",
+			sinceCursor: 8,
+			targetCursor: 7,
+			code: "invalid_cursor_range",
+		},
+	])("rejects an invalid entry-state range: $name", async (input) => {
+		const session = testSocketSession();
+		const sender = testWebSocket();
+		const socketService = createMockCoordinatorSocketService({
+			readSocketSession: vi.fn(() => session),
+			sendSocketMessage: vi.fn(),
+		});
+		const listEntryStates = vi.fn();
+		const stateRepository = createMockCoordinatorStateRepository({
+			currentCursor: vi.fn(() => 10),
+			listEntryStates,
+		});
+		const service = createCoordinatorService({ stateRepository, socketService });
+
+		await service.handleSocketMessage(
+			sender,
+			JSON.stringify({
+				type: "list_entry_states",
+				requestId: "request-entry-states",
+				sinceCursor: input.sinceCursor,
+				targetCursor: input.targetCursor,
+				after: null,
+				limit: 100,
+			}),
+		);
+
+		expect(socketService.sendSocketMessage).toHaveBeenCalledWith(
+			sender,
+			expect.objectContaining({
+				type: "entry_states_list_failed",
+				requestId: "request-entry-states",
+				code: input.code,
+			}),
+		);
+		expect(listEntryStates).not.toHaveBeenCalled();
+	});
 });

@@ -108,6 +108,16 @@ export class CoordinatorControlMessageHandler {
 
 		if (parsed.type === "hello") {
 			try {
+				const currentCursor = this.stateRepository.currentCursor();
+				if (parsed.lastKnownCursor > currentCursor) {
+					this.socketService.sendSocketMessage(ws, {
+						type: "session_error",
+						code: "cursor_ahead_of_server",
+						message:
+							"Sync was paused because this device's sync history no longer matches the remote vault. To resume syncing, disconnect and reconnect the remote vault in Synch settings.",
+					});
+					return;
+				}
 				this.stateRepository.recordLocalVaultConnection(
 					session.userId,
 					session.localVaultId,
