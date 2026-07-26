@@ -19,7 +19,7 @@
 		"test:integration:watch": "vitest --config ./vitest.config.mts",
 		"test:unit": "vitest run --config ./vitest.unit.config.mts",
 		"test:smoke": "node ./scripts/e2e-smoke.mjs",
-		"cf-typegen": "wrangler types",
+		"cf-typegen": "wrangler types && node ./scripts/sanitize-worker-types.mjs",
 		"typecheck": "tsgo --noEmit"
 	},
 	"cloudflare": {
