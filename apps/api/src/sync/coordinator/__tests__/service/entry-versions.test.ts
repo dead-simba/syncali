@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
 	createCoordinatorService,
 	createMockCoordinatorSocketService,
-	createMockCoordinatorStateRepository,
+	createTestCoordinatorState,
 	testSocketSession,
 	testWebSocket,
 } from "./helpers";
@@ -16,16 +16,16 @@ describe("coordinator entry version history", () => {
 			readSocketSession: vi.fn(() => session),
 			sendSocketMessage: vi.fn(),
 		});
-		const stateRepository = createMockCoordinatorStateRepository({
+		const stateRepository = createTestCoordinatorState({
 			listEntryVersions: vi.fn(() => [
 				{
 					version_id: "version-1",
 					entry_id: "entry-1",
 					source_revision: 2,
-					op_type: "upsert",
+					op_type: "upsert" as const,
 					blob_id: "blob-1",
 					encrypted_metadata: "metadata",
-					reason: "auto",
+					reason: "auto" as const,
 					captured_at: 123,
 				},
 			]),
@@ -65,7 +65,7 @@ describe("coordinator entry version history", () => {
 
 	it("restores entry history with client-reencrypted metadata", async () => {
 		const session = testSocketSession();
-		const stateRepository = createMockCoordinatorStateRepository({
+		const stateRepository = createTestCoordinatorState({
 			readEntry: vi.fn(() => ({
 				entry_id: "entry-1",
 				revision: 2,
@@ -77,10 +77,10 @@ describe("coordinator entry version history", () => {
 				version_id: "version-1",
 				entry_id: "entry-1",
 				source_revision: 1,
-				op_type: "upsert",
+				op_type: "upsert" as const,
 				blob_id: "blob-1",
 				encrypted_metadata: "old-metadata",
-				reason: "auto",
+				reason: "auto" as const,
 				bucket_start_ms: 0,
 				captured_at: 123,
 				created_by_user_id: "user-2",
@@ -142,7 +142,7 @@ describe("coordinator entry version history", () => {
 
 	it("restores entry history in batches with per-entry results", async () => {
 		const session = testSocketSession();
-		const stateRepository = createMockCoordinatorStateRepository({
+		const stateRepository = createTestCoordinatorState({
 			readEntry: vi.fn(() => ({
 				entry_id: "entry-1",
 				revision: 2,
@@ -154,10 +154,10 @@ describe("coordinator entry version history", () => {
 				version_id: "version-1",
 				entry_id: "entry-1",
 				source_revision: 1,
-				op_type: "upsert",
+				op_type: "upsert" as const,
 				blob_id: "blob-1",
 				encrypted_metadata: "old-metadata",
-				reason: "auto",
+				reason: "auto" as const,
 				bucket_start_ms: 0,
 				captured_at: 123,
 				created_by_user_id: "user-2",
@@ -238,7 +238,7 @@ describe("coordinator entry version history", () => {
 
 	it("rejects stale client-assisted restores", async () => {
 		const session = testSocketSession();
-		const stateRepository = createMockCoordinatorStateRepository({
+		const stateRepository = createTestCoordinatorState({
 			readEntry: vi.fn(() => ({
 				entry_id: "entry-1",
 				revision: 3,
@@ -250,10 +250,10 @@ describe("coordinator entry version history", () => {
 				version_id: "version-1",
 				entry_id: "entry-1",
 				source_revision: 1,
-				op_type: "upsert",
+				op_type: "upsert" as const,
 				blob_id: "blob-1",
 				encrypted_metadata: "old-metadata",
-				reason: "auto",
+				reason: "auto" as const,
 				bucket_start_ms: 0,
 				captured_at: 123,
 				created_by_user_id: "user-2",
@@ -281,7 +281,7 @@ describe("coordinator entry version history", () => {
 
 	it("rejects restores when the client payload does not match the version", async () => {
 		const session = testSocketSession();
-		const stateRepository = createMockCoordinatorStateRepository({
+		const stateRepository = createTestCoordinatorState({
 			readEntry: vi.fn(() => ({
 				entry_id: "entry-1",
 				revision: 2,
@@ -293,10 +293,10 @@ describe("coordinator entry version history", () => {
 				version_id: "version-1",
 				entry_id: "entry-1",
 				source_revision: 1,
-				op_type: "upsert",
+				op_type: "upsert" as const,
 				blob_id: "blob-1",
 				encrypted_metadata: "old-metadata",
-				reason: "auto",
+				reason: "auto" as const,
 				bucket_start_ms: 0,
 				captured_at: 123,
 				created_by_user_id: "user-2",

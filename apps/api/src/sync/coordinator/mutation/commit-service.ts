@@ -1,7 +1,12 @@
-import type { BlobRepository } from "../../blob/repository";
 import { blobObjectKey } from "../../blob/object-key";
-import type { MaintenanceJobKey } from "../maintenance-scheduler";
-import type { CoordinatorStateRepository } from "../state-repository";
+import type { MaintenanceScheduler } from "../maintenance-scheduler";
+import type {
+	BlobStateStore,
+	BlobObjectRepository,
+	HealthSummaryScheduler,
+	MutationStore,
+	VaultStateStore,
+} from "../ports";
 import type {
 	CommitMutationMessage,
 	CommitMutationResult,
@@ -12,16 +17,16 @@ import type {
 
 export class MutationCommitService {
 	constructor(
-		private readonly stateRepository: CoordinatorStateRepository,
-		private readonly blobRepository: BlobRepository,
+		private readonly mutationStore: MutationStore,
+		private readonly blobStore: Pick<BlobStateStore, "nextBlobGcAt">,
+		private readonly vaultStateStore: Pick<
+			VaultStateStore,
+			"readVersionHistoryRetentionDays"
+		>,
+		private readonly blobRepository: BlobObjectRepository,
 		private readonly blobGracePeriodMs: number,
-		private readonly readVersionHistoryRetentionMs: (vaultId: string) => Promise<number>,
-		private readonly deferMaintenance: (
-			key: MaintenanceJobKey,
-			timestamp: number,
-			now?: number,
-		) => Promise<void>,
-		private readonly scheduleHealthSummaryFlush: (now?: number) => Promise<void>,
+		private readonly maintenanceScheduler: MaintenanceScheduler,
+		private readonly healthSummaryScheduler: HealthSummaryScheduler,
 	) {}
 
 	async commitMutations(
@@ -46,22 +51,22 @@ export class MutationCommitService {
 			}),
 		);
 
-		const result = await this.stateRepository.commitMutations(
+		const result = await this.mutationStore.commitMutations(
 			session,
 			message,
 			this.blobGracePeriodMs,
-			await this.readVersionHistoryRetentionMs(session.vaultId),
+			this.vaultStateStore.readVersionHistoryRetentionDays() * DAY_IN_MS,
 			{
 				...options,
 				unavailableBlobIds,
 			},
 		);
 		if (result.broadcastCursor !== null) {
-			const nextGcAt = this.stateRepository.nextBlobGcAt();
+			const nextGcAt = this.blobStore.nextBlobGcAt();
 			if (nextGcAt !== null) {
-				await this.deferMaintenance("blob_gc", nextGcAt);
+				await this.maintenanceScheduler.defer("blob_gc", nextGcAt);
 			}
-			await this.scheduleHealthSummaryFlush();
+			await this.healthSummaryScheduler.scheduleSummaryFlush();
 		}
 		return result;
 	}
@@ -111,3 +116,5 @@ export class MutationCommitService {
 		};
 	}
 }
+
+const DAY_IN_MS = 24 * 60 * 60 * 1000;

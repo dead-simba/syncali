@@ -1,8 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { HealthSyncService } from "./sync-service";
-import type { CoordinatorStateRepository } from "../state-repository";
-import type { VaultSyncStatusRepository } from "../../health/status-repository";
+import type { HealthStateStore } from "../ports";
 
 describe("HealthSyncService", () => {
 	it("coalesces delayed health summary flush scheduling", async () => {
@@ -12,7 +11,7 @@ describe("HealthSyncService", () => {
 			stateRepository,
 			null,
 			30 * 24 * 60 * 60 * 1000,
-			deferMaintenance,
+			{ defer: deferMaintenance },
 		);
 
 		await service.scheduleSummaryFlush(1_000);
@@ -34,7 +33,7 @@ describe("HealthSyncService", () => {
 			stateRepository,
 			null,
 			30 * 24 * 60 * 60 * 1000,
-			deferMaintenance,
+			{ defer: deferMaintenance },
 		);
 
 		await service.scheduleSummaryFlush(1_000);
@@ -47,7 +46,7 @@ describe("HealthSyncService", () => {
 		const stateRepository = createStateRepository({
 			readHealthSummary: vi.fn(() => ({
 				vaultId: "vault-1",
-				healthStatus: "ok",
+				healthStatus: "ok" as const,
 				healthReasons: [],
 				currentCursor: 1,
 				entryCount: 1,
@@ -67,13 +66,13 @@ describe("HealthSyncService", () => {
 		});
 		const syncStatusRepository = {
 			upsert: vi.fn(async () => {}),
-		} as unknown as VaultSyncStatusRepository;
+		};
 		const deferMaintenance = vi.fn(async () => {});
 		const service = new HealthSyncService(
 			stateRepository,
 			syncStatusRepository,
 			30 * 24 * 60 * 60 * 1000,
-			deferMaintenance,
+			{ defer: deferMaintenance },
 		);
 
 		await service.scheduleSummaryFlush(1_000);
@@ -85,12 +84,17 @@ describe("HealthSyncService", () => {
 });
 
 function createStateRepository(
-	overrides: Partial<Record<keyof CoordinatorStateRepository, unknown>> = {},
-): CoordinatorStateRepository {
+	overrides: Partial<HealthStateStore> = {},
+): HealthStateStore {
 	return {
+		recordGcCompleted: vi.fn(),
 		readHealthSummary: vi.fn(() => null),
 		recordHealthSummaryFlushed: vi.fn(),
 		recordHealthSummaryFlushFailed: vi.fn(() => 1),
+		readStorageStatus: vi.fn(() => ({
+			storageUsedBytes: 0,
+			storageLimitBytes: 100,
+		})),
 		...overrides,
-	} as unknown as CoordinatorStateRepository;
+	};
 }

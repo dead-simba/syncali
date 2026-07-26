@@ -4,7 +4,23 @@ import { z } from "zod";
 
 import { onError } from "../../errors";
 import { BLOB_SIZE_HEADER, parseBlobSizeHeader } from "../blob/size";
-import type { CoordinatorService } from "./service";
+import type { VaultStateLimits } from "./types";
+
+export interface CoordinatorHttpUseCases {
+	stageBlob(
+		request: Request,
+		vaultId: string,
+		blobId: string,
+		sizeBytes: number,
+	): Promise<void>;
+	abortStagedBlob(request: Request, vaultId: string, blobId: string): Promise<void>;
+	applyVaultPolicy(
+		vaultId: string,
+		limits: VaultStateLimits,
+	): Promise<{ applied: boolean }>;
+	purgeVault(vaultId: string): Promise<void>;
+	openSocket(request: Request, vaultId: string): Promise<Response>;
+}
 
 const policyLimitsSchema = z.object({
 	storageLimitBytes: z.number().int().nonnegative(),
@@ -13,7 +29,7 @@ const policyLimitsSchema = z.object({
 });
 
 export function createCoordinatorApp(
-	deps: { coordinatorService: CoordinatorService },
+	deps: { useCases: CoordinatorHttpUseCases },
 ) {
 	const app = new Hono();
 
@@ -38,7 +54,7 @@ export function createCoordinatorApp(
 					400,
 				);
 			}
-			await deps.coordinatorService.stageBlob(c.req.raw, vaultId, blobId, sizeBytes);
+			await deps.useCases.stageBlob(c.req.raw, vaultId, blobId, sizeBytes);
 			return new Response(null, { status: 204 });
 		},
 	);
@@ -54,7 +70,7 @@ export function createCoordinatorApp(
 		),
 		async (c) => {
 			const { vaultId, blobId } = c.req.valid("param");
-			await deps.coordinatorService.abortStagedBlob(c.req.raw, vaultId, blobId);
+			await deps.useCases.abortStagedBlob(c.req.raw, vaultId, blobId);
 			return new Response(null, { status: 204 });
 		},
 	);
@@ -76,7 +92,7 @@ export function createCoordinatorApp(
 		async (c) => {
 			const { vaultId } = c.req.valid("param");
 			const body = c.req.valid("json");
-			const result = await deps.coordinatorService.applyVaultPolicy(
+			const result = await deps.useCases.applyVaultPolicy(
 				vaultId,
 				body.limits,
 			);
@@ -94,7 +110,7 @@ export function createCoordinatorApp(
 		),
 		async (c) => {
 			const { vaultId } = c.req.valid("param");
-			await deps.coordinatorService.purgeVault(vaultId);
+			await deps.useCases.purgeVault(vaultId);
 			return new Response(null, { status: 204 });
 		},
 	);
@@ -120,7 +136,7 @@ export function createCoordinatorApp(
 			}
 
 			const { vaultId } = c.req.valid("param");
-			return await deps.coordinatorService.openSocket(request, vaultId);
+			return await deps.useCases.openSocket(request, vaultId);
 		},
 	);
 	app.notFound((c) =>

@@ -2,6 +2,7 @@ import type {
 	CommitMutationsMessage,
 	CommitMutationsResult,
 	DeletedEntriesListedMessage,
+	DeletedEntriesPurgeResult,
 	EntryStatesListedMessage,
 	EntryVersionsListedMessage,
 	ListDeletedEntriesMessage,
@@ -18,9 +19,12 @@ import {
 	formatClientControlMessageError,
 	parseClientControlMessage,
 } from "../protocol";
-import type { CoordinatorSocketService } from "./service";
-import type { CoordinatorStateRepository } from "../state-repository";
-import type { DeletedEntriesPurgeResult } from "../entry/history-service";
+import type {
+	HealthStateStore,
+	HealthSummaryScheduler,
+	SocketGateway,
+	VaultStateStore,
+} from "../ports";
 
 export type CoordinatorControlMessageUseCases = {
 	detachLocalVault(session: SocketSession): Promise<void>;
@@ -54,12 +58,28 @@ export type CoordinatorControlMessageUseCases = {
 	): Promise<DeletedEntriesPurgeResult>;
 };
 
-export class CoordinatorControlMessageHandler {
+export interface CoordinatorSocketMessageHandler {
+	handle(ws: WebSocket, message: string | ArrayBuffer): Promise<void>;
+}
+
+export class CoordinatorControlMessageHandler
+	implements CoordinatorSocketMessageHandler
+{
 	constructor(
-		private readonly socketService: CoordinatorSocketService,
-		private readonly stateRepository: CoordinatorStateRepository,
+		private readonly socketService: Pick<
+			SocketGateway,
+			| "readSocketSession"
+			| "attachSocketSession"
+			| "sendSocketMessage"
+			| "broadcastExcept"
+		>,
+		private readonly vaultStateStore: Pick<
+			VaultStateStore,
+			"currentCursor" | "recordLocalVaultConnection" | "readVaultLimits"
+		>,
+		private readonly healthStore: Pick<HealthStateStore, "readStorageStatus">,
 		private readonly useCases: CoordinatorControlMessageUseCases,
-		private readonly scheduleHealthSummaryFlush: () => Promise<void>,
+		private readonly healthSummaryScheduler: HealthSummaryScheduler,
 	) {}
 
 	async handle(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
@@ -108,7 +128,7 @@ export class CoordinatorControlMessageHandler {
 
 		if (parsed.type === "hello") {
 			try {
-				const currentCursor = this.stateRepository.currentCursor();
+				const currentCursor = this.vaultStateStore.currentCursor();
 				if (parsed.lastKnownCursor > currentCursor) {
 					this.socketService.sendSocketMessage(ws, {
 						type: "session_error",
@@ -118,21 +138,21 @@ export class CoordinatorControlMessageHandler {
 					});
 					return;
 				}
-				this.stateRepository.recordLocalVaultConnection(
+				this.vaultStateStore.recordLocalVaultConnection(
 					session.userId,
 					session.localVaultId,
 				);
-				const limits = this.stateRepository.readVaultLimits();
-				await this.scheduleHealthSummaryFlush();
+				const limits = this.vaultStateStore.readVaultLimits();
+				await this.healthSummaryScheduler.scheduleSummaryFlush();
 				this.socketService.sendSocketMessage(ws, {
 					type: "hello_ack",
 					requestId: parsed.requestId,
-					cursor: this.stateRepository.currentCursor(),
+					cursor: this.vaultStateStore.currentCursor(),
 					policy: {
 						storageLimitBytes: limits.storageLimitBytes,
 						maxFileSizeBytes: limits.maxFileSizeBytes,
 					},
-					storageStatus: this.stateRepository.readStorageStatus(),
+					storageStatus: this.healthStore.readStorageStatus(),
 				});
 			} catch (error) {
 				this.socketService.sendSocketMessage(ws, {
@@ -336,7 +356,7 @@ export class CoordinatorControlMessageHandler {
 			this.socketService.attachSocketSession(ws, nextSession);
 			this.socketService.sendSocketMessage(ws, {
 				type: "storage_status_updated",
-				storageStatus: this.stateRepository.readStorageStatus(),
+				storageStatus: this.healthStore.readStorageStatus(),
 			});
 			return;
 		}

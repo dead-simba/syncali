@@ -3,31 +3,34 @@ import type {
 	ListEntryStatesMessage,
 	SocketSession,
 } from "../types";
-import type { CoordinatorStateRepository } from "../state-repository";
+import type { EntryStateStore, VaultStateStore } from "../ports";
 
 const MAX_ENTRY_STATE_BATCH = 500;
 
 export class EntrySyncService {
-	constructor(private readonly stateRepository: CoordinatorStateRepository) {}
+	constructor(
+		private readonly entryStore: EntryStateStore,
+		private readonly vaultStateStore: Pick<VaultStateStore, "currentCursor">,
+	) {}
 
 	listEntryStates(
 		session: SocketSession,
 		message: ListEntryStatesMessage,
 	): EntryStatesListedMessage {
 		const effectiveLimit = Math.min(message.limit, MAX_ENTRY_STATE_BATCH);
-		const currentCursor = this.stateRepository.currentCursor();
+		const currentCursor = this.vaultStateStore.currentCursor();
 		const targetCursor =
 			message.targetCursor === null
 				? currentCursor
 				: message.targetCursor;
 		validateCursorRange(message, targetCursor, currentCursor);
-		const entries = this.stateRepository.listEntryStates(
+		const entries = this.entryStore.listEntryStates(
 			message.sinceCursor,
 			targetCursor,
 			message.after,
 			effectiveLimit + 1,
 		);
-		const totalEntries = this.stateRepository.countEntryStates(
+		const totalEntries = this.entryStore.countEntryStates(
 			message.sinceCursor,
 			targetCursor,
 		);

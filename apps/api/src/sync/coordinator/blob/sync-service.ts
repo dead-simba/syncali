@@ -1,26 +1,32 @@
 import { DomainError, domainApiError } from "../../../errors";
-import type { SyncTokenService } from "../../access/token-service";
 import { blobObjectKey } from "../../blob/object-key";
-import type { BlobRepository } from "../../blob/repository";
-import type { MaintenanceJobKey } from "../maintenance-scheduler";
-import type { CoordinatorSocketService } from "../socket/service";
-import type { CoordinatorStateRepository } from "../state-repository";
+import type { MaintenanceScheduler } from "../maintenance-scheduler";
+import type {
+	BlobObjectRepository,
+	BlobStateStore,
+	HealthStateStore,
+	HealthSummaryScheduler,
+	SocketGateway,
+	SyncTokenVerifier,
+	VaultStateStore,
+} from "../ports";
 
 const GC_BATCH_SIZE = 64;
 
 export class BlobSyncService {
 	constructor(
-		private readonly syncTokenService: SyncTokenService,
-		private readonly stateRepository: CoordinatorStateRepository,
-		private readonly socketService: CoordinatorSocketService,
-		private readonly blobRepository: BlobRepository,
+		private readonly syncTokenService: SyncTokenVerifier,
+		private readonly blobStore: BlobStateStore,
+		private readonly vaultStateStore: Pick<VaultStateStore, "readVaultId">,
+		private readonly healthStore: Pick<
+			HealthStateStore,
+			"recordGcCompleted" | "readStorageStatus"
+		>,
+		private readonly socketService: Pick<SocketGateway, "broadcastStorageStatus">,
+		private readonly blobRepository: BlobObjectRepository,
 		private readonly blobGracePeriodMs: number,
-		private readonly deferMaintenance: (
-			key: MaintenanceJobKey,
-			timestamp: number,
-			now?: number,
-		) => Promise<void>,
-		private readonly scheduleHealthSummaryFlush: (now?: number) => Promise<void>,
+		private readonly maintenanceScheduler: MaintenanceScheduler,
+		private readonly healthSummaryScheduler: HealthSummaryScheduler,
 	) {}
 
 	async stageBlob(
@@ -33,13 +39,17 @@ export class BlobSyncService {
 
 		const now = Date.now();
 		try {
-			await this.stateRepository.stageBlob(
+			await this.blobStore.stageBlob(
 				blobId,
 				sizeBytes,
 				now,
 				now + this.blobGracePeriodMs,
 			);
-			await this.deferMaintenance("blob_gc", now + this.blobGracePeriodMs, now);
+			await this.maintenanceScheduler.defer(
+				"blob_gc",
+				now + this.blobGracePeriodMs,
+				now,
+			);
 			this.broadcastStorageStatus();
 		} catch (error) {
 			if (error instanceof DomainError) {
@@ -55,22 +65,22 @@ export class BlobSyncService {
 		blobId: string,
 	): Promise<void> {
 		await this.syncTokenService.requireSyncToken(request, vaultId);
-		this.stateRepository.abortStagedBlob(blobId, Date.now());
-		await this.scheduleHealthSummaryFlush();
+		this.blobStore.abortStagedBlob(blobId, Date.now());
+		await this.healthSummaryScheduler.scheduleSummaryFlush();
 		this.broadcastStorageStatus();
 	}
 
 	async deleteBlob(request: Request, vaultId: string, blobId: string): Promise<void> {
 		await this.syncTokenService.requireSyncToken(request, vaultId);
-		const blob = this.stateRepository.readBlob(blobId);
-		if (blob && this.stateRepository.isBlobPinned(blobId, false)) {
+		const blob = this.blobStore.readBlob(blobId);
+		if (blob && this.blobStore.isBlobPinned(blobId, false)) {
 			return;
 		}
 
 		await this.blobRepository.delete(blobObjectKey(vaultId, blobId));
 		if (blob) {
-			this.stateRepository.deleteBlobRecord(blobId);
-			await this.scheduleHealthSummaryFlush();
+			this.blobStore.deleteBlobRecord(blobId);
+			await this.healthSummaryScheduler.scheduleSummaryFlush();
 			this.broadcastStorageStatus();
 		}
 	}
@@ -83,25 +93,25 @@ export class BlobSyncService {
 			scheduleNextGc?: boolean;
 		} = {},
 	): Promise<number | null> {
-		const effectiveVaultId = vaultId ?? this.stateRepository.readVaultId();
+		const effectiveVaultId = vaultId ?? this.vaultStateStore.readVaultId();
 		if (!effectiveVaultId) {
 			return null;
 		}
 
 		const now = options.now ?? Date.now();
-		const due = this.stateRepository.listBlobsReadyForDeletion(now, GC_BATCH_SIZE);
+		const due = this.blobStore.listBlobsReadyForDeletion(now, GC_BATCH_SIZE);
 		for (const blob of due) {
 			await this.blobRepository.delete(blobObjectKey(effectiveVaultId, blob.blob_id));
-			this.stateRepository.deleteBlobIfCollectible(blob.blob_id, now);
+			this.blobStore.deleteBlobIfCollectible(blob.blob_id, now);
 		}
 
-		const nextGcAt = this.stateRepository.nextBlobGcAt();
+		const nextGcAt = this.blobStore.nextBlobGcAt();
 		if ((options.scheduleNextGc ?? true) && nextGcAt !== null) {
-			await this.deferMaintenance("blob_gc", nextGcAt, now);
+			await this.maintenanceScheduler.defer("blob_gc", nextGcAt, now);
 		}
-		this.stateRepository.recordGcCompleted(now);
+		this.healthStore.recordGcCompleted(now);
 		if (options.scheduleHealthFlush ?? true) {
-			await this.deferMaintenance("health_summary_flush", now, now);
+			await this.maintenanceScheduler.defer("health_summary_flush", now, now);
 		}
 		if (due.length > 0) {
 			this.broadcastStorageStatus();
@@ -109,8 +119,54 @@ export class BlobSyncService {
 		return nextGcAt;
 	}
 
+	async collectPurgedBlobs(
+		vaultId: string,
+		blobIds: readonly string[],
+	): Promise<void> {
+		const uniqueBlobIds = [...new Set(blobIds)];
+		if (uniqueBlobIds.length === 0) {
+			return;
+		}
+
+		const now = Date.now();
+		let deletedCount = 0;
+		for (const blobId of uniqueBlobIds) {
+			this.blobStore.markBlobPendingDeleteIfUnpinned(blobId, now);
+			const blob = this.blobStore.readBlob(blobId);
+			if (
+				!blob ||
+				blob.state !== "pending_delete" ||
+				(blob.delete_after !== null && blob.delete_after > now) ||
+				this.blobStore.isBlobPinned(blobId, false, now)
+			) {
+				continue;
+			}
+
+			try {
+				await this.blobRepository.delete(blobObjectKey(vaultId, blobId));
+				this.blobStore.deleteBlobIfCollectible(blobId, now);
+				deletedCount += 1;
+			} catch (error) {
+				console.error("[sync-coordinator] immediate purged blob deletion failed", {
+					vaultId,
+					blobId,
+					error: error instanceof Error ? error.message : String(error),
+				});
+			}
+		}
+
+		const nextGcAt = this.blobStore.nextBlobGcAt();
+		if (nextGcAt !== null) {
+			await this.maintenanceScheduler.defer("blob_gc", nextGcAt, now);
+		}
+		await this.healthSummaryScheduler.scheduleSummaryFlush(now);
+		if (deletedCount > 0) {
+			this.broadcastStorageStatus();
+		}
+	}
+
 	private broadcastStorageStatus(): void {
-		const storageStatus = this.stateRepository.readStorageStatus();
+		const storageStatus = this.healthStore.readStorageStatus();
 		this.socketService.broadcastStorageStatus({
 			type: "storage_status_updated",
 			storageStatus,

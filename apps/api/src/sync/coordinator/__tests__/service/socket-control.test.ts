@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
 	createCoordinatorService,
 	createMockCoordinatorSocketService,
-	createMockCoordinatorStateRepository,
+	createTestCoordinatorState,
 	socketServiceMock,
 	socketStateRepository,
 	testSocketSession,
@@ -19,17 +19,7 @@ describe("coordinator websocket control messages", () => {
 		};
 		const stateRepository = socketStateRepository();
 		const socketService = createMockCoordinatorSocketService({
-			openSocket: vi.fn(
-				async (
-					_request,
-					_vaultId,
-					_syncTokenService,
-					ensureVaultState,
-				) => {
-					await ensureVaultState("vault-1");
-					return new Response(null, { status: 200 });
-				},
-			),
+			openSocket: vi.fn(async () => new Response(null, { status: 200 })),
 		});
 		const initialVaultLimitReader = {
 			readInitialVaultLimits: vi.fn(async () => limits),
@@ -55,17 +45,7 @@ describe("coordinator websocket control messages", () => {
 		const stateRepository = socketStateRepository();
 		vi.mocked(stateRepository.vaultStateExistsFor).mockReturnValue(true);
 		const socketService = createMockCoordinatorSocketService({
-			openSocket: vi.fn(
-				async (
-					_request,
-					_vaultId,
-					_syncTokenService,
-					ensureVaultState,
-				) => {
-					await ensureVaultState("vault-1");
-					return new Response(null, { status: 200 });
-				},
-			),
+			openSocket: vi.fn(async () => new Response(null, { status: 200 })),
 		});
 		const initialVaultLimitReader = {
 			readInitialVaultLimits: vi.fn(async () => ({
@@ -673,7 +653,7 @@ describe("coordinator websocket control messages", () => {
 
 	it("ignores socket close bookkeeping after a vault purge deletes storage", async () => {
 		let service: ReturnType<typeof createCoordinatorService>;
-		const stateRepository = createMockCoordinatorStateRepository({
+		const stateRepository = createTestCoordinatorState({
 			purgeVaultState: vi.fn(async () => {}),
 		});
 		const socketService = socketServiceMock();
@@ -698,7 +678,7 @@ describe("coordinator websocket control messages", () => {
 	});
 
 	it("ignores maintenance alarms after a vault purge deletes storage", async () => {
-		const stateRepository = createMockCoordinatorStateRepository({
+		const stateRepository = createTestCoordinatorState({
 			purgeVaultState: vi.fn(async () => {}),
 		});
 		const socketService = socketServiceMock();
@@ -706,14 +686,15 @@ describe("coordinator websocket control messages", () => {
 			deleteByPrefix: vi.fn(async () => {}),
 		};
 		const maintenanceScheduler = {
+			defer: vi.fn(async () => {}),
 			drain: vi.fn(async () => {}),
 		};
 		const service = createCoordinatorService({
 			stateRepository,
 			socketService,
 			blobRepository: blobRepository as never,
+			maintenanceScheduler,
 		});
-		service.setMaintenanceScheduler(maintenanceScheduler as never);
 
 		await service.purgeVault("vault-1");
 		await service.handleAlarm();

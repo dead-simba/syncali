@@ -1,21 +1,21 @@
-import type { MaintenanceJobKey } from "../maintenance-scheduler";
-import type { CoordinatorStateRepository } from "../state-repository";
-import type { VaultSyncStatusRepository } from "../../health/status-repository";
+import type { MaintenanceScheduler } from "../maintenance-scheduler";
+import type { HealthStateStore } from "../ports";
+import type { VaultSyncStatusSummary } from "../../health/types";
 
 const DEFAULT_HEALTH_SUMMARY_FLUSH_DELAY_MS = 10 * 60 * 1000;
+
+export interface VaultSyncStatusWriter {
+	upsert(summary: VaultSyncStatusSummary, flushedAt: number): Promise<void>;
+}
 
 export class HealthSyncService {
 	private scheduledFlushAt: number | null = null;
 
 	constructor(
-		private readonly stateRepository: CoordinatorStateRepository,
-		private readonly syncStatusRepository: VaultSyncStatusRepository | null,
+		private readonly healthStore: HealthStateStore,
+		private readonly syncStatusRepository: VaultSyncStatusWriter | null,
 		private readonly cursorActiveTtlMs: number,
-		private readonly deferMaintenance: (
-			key: MaintenanceJobKey,
-			timestamp: number,
-			now?: number,
-		) => Promise<void>,
+		private readonly maintenanceScheduler: MaintenanceScheduler,
 	) {}
 
 	async scheduleSummaryFlush(now = Date.now()): Promise<void> {
@@ -24,7 +24,7 @@ export class HealthSyncService {
 			return;
 		}
 
-		await this.deferMaintenance("health_summary_flush", flushAt, now);
+		await this.maintenanceScheduler.defer("health_summary_flush", flushAt, now);
 		this.scheduledFlushAt = flushAt;
 	}
 
@@ -36,22 +36,22 @@ export class HealthSyncService {
 		}
 
 		const now = options.now ?? Date.now();
-		const summary = this.stateRepository.readHealthSummary(now, this.cursorActiveTtlMs);
+		const summary = this.healthStore.readHealthSummary(now, this.cursorActiveTtlMs);
 		if (!summary) {
 			return;
 		}
 
 		try {
 			await this.syncStatusRepository.upsert(summary, now);
-			this.stateRepository.recordHealthSummaryFlushed(now);
+			this.healthStore.recordHealthSummaryFlushed(now);
 			this.scheduledFlushAt = null;
 		} catch (error) {
-			this.stateRepository.recordHealthSummaryFlushFailed(error, now);
+			this.healthStore.recordHealthSummaryFlushFailed(error, now);
 			this.scheduledFlushAt = null;
 			if (options.throwOnError) {
 				throw error;
 			}
-			await this.deferMaintenance("health_summary_flush", now, now);
+			await this.maintenanceScheduler.defer("health_summary_flush", now, now);
 		}
 	}
 }

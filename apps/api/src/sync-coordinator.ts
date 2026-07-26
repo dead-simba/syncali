@@ -5,6 +5,7 @@ import type {
 	CommitMutationsMessage,
 	CommitMutationsResult,
 	DeletedEntriesListedMessage,
+	DeletedEntriesPurgeResult,
 	EntryStatesListedMessage,
 	EntryVersionsListedMessage,
 	ListDeletedEntriesMessage,
@@ -17,22 +18,24 @@ import type {
 	RestoreEntryVersionsResult,
 	SocketSession,
 } from "./sync/coordinator/types";
-import { CoordinatorService } from "./sync/coordinator/service";
+import type { CoordinatorDurableObjectUseCases } from "./sync/coordinator/service";
+import type { CoordinatorSocketMessageHandler } from "./sync/coordinator/socket/control-message-handler";
 import { createCoordinatorRuntime } from "./runtime";
-import type { DeletedEntriesPurgeResult } from "./sync/coordinator/entry/history-service";
 
 const ALARM_FAILURE_RETRY_MS = 30 * 1000;
 
 export class SyncCoordinator extends DurableObject {
 	private readonly app: ReturnType<typeof createCoordinatorRuntime>["app"];
-	private readonly coordinatorService: CoordinatorService;
+	private readonly useCases: CoordinatorDurableObjectUseCases;
+	private readonly socketMessageHandler: CoordinatorSocketMessageHandler;
 	private readonly ready: Promise<void>;
 
 	constructor(ctx: DurableObjectState, env: Env) {
 		super(ctx, env);
 		const runtime = createCoordinatorRuntime(ctx, env);
 		this.app = runtime.app;
-		this.coordinatorService = runtime.coordinatorService;
+		this.useCases = runtime.useCases;
+		this.socketMessageHandler = runtime.socketMessageHandler;
 		this.ready = runtime.ready;
 	}
 
@@ -43,7 +46,7 @@ export class SyncCoordinator extends DurableObject {
 
 	async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
 		await this.ready;
-		await this.coordinatorService.handleSocketMessage(ws, message);
+		await this.socketMessageHandler.handle(ws, message);
 	}
 
 	async commitMutations(
@@ -51,7 +54,7 @@ export class SyncCoordinator extends DurableObject {
 		message: CommitMutationsMessage,
 	): Promise<CommitMutationsResult> {
 		await this.ready;
-		return await this.coordinatorService.commitMutations(session, message);
+		return await this.useCases.commitMutations(session, message);
 	}
 
 	async commitMutation(
@@ -59,7 +62,7 @@ export class SyncCoordinator extends DurableObject {
 		message: CommitMutationMessage,
 	): Promise<CommitMutationResult> {
 		await this.ready;
-		return await this.coordinatorService.commitMutation(session, message);
+		return await this.useCases.commitMutation(session, message);
 	}
 
 	async listEntryStates(
@@ -67,7 +70,7 @@ export class SyncCoordinator extends DurableObject {
 		message: ListEntryStatesMessage,
 	): Promise<EntryStatesListedMessage> {
 		await this.ready;
-		return this.coordinatorService.listEntryStates(session, message);
+		return this.useCases.listEntryStates(session, message);
 	}
 
 	async listEntryVersions(
@@ -75,7 +78,7 @@ export class SyncCoordinator extends DurableObject {
 		message: ListEntryVersionsMessage,
 	): Promise<EntryVersionsListedMessage> {
 		await this.ready;
-		return await this.coordinatorService.listEntryVersions(session, message);
+		return await this.useCases.listEntryVersions(session, message);
 	}
 
 	async listDeletedEntries(
@@ -83,7 +86,7 @@ export class SyncCoordinator extends DurableObject {
 		message: ListDeletedEntriesMessage,
 	): Promise<DeletedEntriesListedMessage> {
 		await this.ready;
-		return await this.coordinatorService.listDeletedEntries(session, message);
+		return await this.useCases.listDeletedEntries(session, message);
 	}
 
 	async restoreEntryVersion(
@@ -91,7 +94,7 @@ export class SyncCoordinator extends DurableObject {
 		message: RestoreEntryVersionMessage,
 	): Promise<RestoreEntryVersionResult> {
 		await this.ready;
-		return await this.coordinatorService.restoreEntryVersion(session, message);
+		return await this.useCases.restoreEntryVersion(session, message);
 	}
 
 	async restoreEntryVersions(
@@ -99,7 +102,7 @@ export class SyncCoordinator extends DurableObject {
 		message: RestoreEntryVersionsMessage,
 	): Promise<RestoreEntryVersionsResult> {
 		await this.ready;
-		return await this.coordinatorService.restoreEntryVersions(session, message);
+		return await this.useCases.restoreEntryVersions(session, message);
 	}
 
 	async purgeDeletedEntries(
@@ -107,23 +110,23 @@ export class SyncCoordinator extends DurableObject {
 		message: PurgeDeletedEntriesMessage,
 	): Promise<DeletedEntriesPurgeResult> {
 		await this.ready;
-		return await this.coordinatorService.purgeDeletedEntries(session, message);
+		return await this.useCases.purgeDeletedEntries(session, message);
 	}
 
 	async runGc(): Promise<void> {
 		await this.ready;
-		await this.coordinatorService.runGc();
+		await this.useCases.runGc();
 	}
 
 	async flushHealthSummary(): Promise<void> {
 		await this.ready;
-		await this.coordinatorService.flushHealthSummary({ force: true });
+		await this.useCases.flushHealthSummary({ force: true });
 	}
 
 	async alarm(alarmInfo?: AlarmInvocationInfo): Promise<void> {
 		try {
 			await this.ready;
-			await this.coordinatorService.handleAlarm();
+			await this.useCases.handleAlarm();
 		} catch (error) {
 			console.error("[sync-coordinator] durable object alarm failed", {
 				objectId: this.ctx.id.toString(),
@@ -154,12 +157,12 @@ export class SyncCoordinator extends DurableObject {
 		_wasClean: boolean,
 	): Promise<void> {
 		await this.ready;
-		await this.coordinatorService.handleSocketClose();
+		await this.useCases.handleSocketClose();
 	}
 
 	async webSocketError(_ws: WebSocket, _error: unknown): Promise<void> {
 		await this.ready;
-		await this.coordinatorService.handleSocketClose();
+		await this.useCases.handleSocketClose();
 	}
 }
 

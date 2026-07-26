@@ -2,17 +2,12 @@ import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/durable-sqlite";
 
 import * as doSchema from "../../../db/do";
+import type { VaultStateLimits } from "../types";
 
 type CursorDb = Pick<
 	ReturnType<typeof drizzle<typeof doSchema>>,
 	"insert" | "select"
 >;
-
-export type VaultStateLimits = {
-	storageLimitBytes: number;
-	maxFileSizeBytes: number;
-	versionHistoryRetentionDays: number;
-};
 
 export class CoordinatorCursorStore {
 	constructor(private readonly storage: DurableObjectStorage) {}
@@ -35,6 +30,73 @@ export class CoordinatorCursorStore {
 			.limit(1)
 			.get();
 		return row?.vaultId ?? null;
+	}
+
+	vaultStateExistsFor(vaultId: string): boolean {
+		const existingVaultId = this.readVaultId();
+		if (!existingVaultId) {
+			return false;
+		}
+		if (existingVaultId !== vaultId) {
+			throw new Error("durable object vault id mismatch");
+		}
+		return true;
+	}
+
+	readVaultLimits(): VaultStateLimits {
+		const row = this.storage.sql
+			.exec<{
+				storage_limit_bytes: number;
+				max_file_size_bytes: number;
+				version_history_retention_days: number;
+			}>(
+				`
+				SELECT
+					storage_limit_bytes,
+					max_file_size_bytes,
+					version_history_retention_days
+				FROM coordinator_state
+				WHERE id = 1
+				`,
+			)
+			.toArray()[0];
+		if (!row) {
+			throw new Error("vault sync state is not initialized");
+		}
+		return {
+			storageLimitBytes: Number(row.storage_limit_bytes),
+			maxFileSizeBytes: Number(row.max_file_size_bytes),
+			versionHistoryRetentionDays: Number(row.version_history_retention_days),
+		};
+	}
+
+	applyVaultPolicy(vaultId: string, limits: VaultStateLimits): boolean {
+		const existingVaultId = this.readVaultId();
+		if (!existingVaultId) {
+			return false;
+		}
+		if (existingVaultId !== vaultId) {
+			throw new Error("durable object vault id mismatch");
+		}
+
+		this.storage.sql.exec(
+			`
+			UPDATE coordinator_state
+			SET
+				storage_limit_bytes = ?,
+				max_file_size_bytes = ?,
+				version_history_retention_days = ?
+			WHERE id = 1
+			`,
+			limits.storageLimitBytes,
+			limits.maxFileSizeBytes,
+			limits.versionHistoryRetentionDays,
+		);
+		return true;
+	}
+
+	readVersionHistoryRetentionDays(): number {
+		return this.readVaultLimits().versionHistoryRetentionDays;
 	}
 
 	recordLocalVaultConnection(userId: string, localVaultId: string): void {

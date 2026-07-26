@@ -5,16 +5,39 @@ import { SubscriptionPolicyService } from "../subscription/policy-service";
 import { SyncTokenService } from "../sync/access/token-service";
 import { BlobRepository } from "../sync/blob/repository";
 import { CoordinatorMaintenanceScheduler } from "../sync/coordinator/maintenance-scheduler";
+import { CoordinatorMaintenanceService } from "../sync/coordinator/maintenance-service";
 import { createCoordinatorApp } from "../sync/coordinator/routes";
 import { CoordinatorService } from "../sync/coordinator/service";
+import { BlobSyncService } from "../sync/coordinator/blob/sync-service";
+import { EntryHistoryService } from "../sync/coordinator/entry/history-service";
+import { EntrySyncService } from "../sync/coordinator/entry/sync-service";
+import { HealthSyncService } from "../sync/coordinator/health/sync-service";
+import { MutationCommitService } from "../sync/coordinator/mutation/commit-service";
+import { CoordinatorControlMessageHandler } from "../sync/coordinator/socket/control-message-handler";
+import { CoordinatorSocketConnectionService } from "../sync/coordinator/socket/connection-service";
 import { CoordinatorSocketService } from "../sync/coordinator/socket/service";
-import { CoordinatorStateRepository } from "../sync/coordinator/state-repository";
+import { DurableCoordinatorStorage } from "../sync/coordinator/storage-lifecycle";
+import { CoordinatorBlobStore } from "../sync/coordinator/store/blob-store";
+import { CoordinatorCursorStore } from "../sync/coordinator/store/cursor-store";
+import { CoordinatorEntryStore } from "../sync/coordinator/store/entry-store";
+import { CoordinatorHealthStore } from "../sync/coordinator/store/health-store";
+import { CoordinatorHistoryStore } from "../sync/coordinator/store/history-store";
+import { CoordinatorMutationStore } from "../sync/coordinator/store/mutation-store";
+import { VaultLifecycleService } from "../sync/coordinator/vault/lifecycle-service";
 import { VaultSyncStatusRepository } from "../sync/health/status-repository";
 import { VaultRepository } from "../vault/repository";
 
 export function createCoordinatorRuntime(ctx: DurableObjectState, env: Env) {
+	const blobGracePeriodMs = 30 * 60 * 1000;
+	const cursorActiveTtlMs = 30 * 24 * 60 * 60 * 1000;
 	const db = createDb(env.DB);
-	const stateRepository = new CoordinatorStateRepository(ctx);
+	const storage = new DurableCoordinatorStorage(ctx);
+	const blobStore = new CoordinatorBlobStore(ctx.storage);
+	const cursorStore = new CoordinatorCursorStore(ctx.storage);
+	const entryStore = new CoordinatorEntryStore(ctx.storage);
+	const healthStore = new CoordinatorHealthStore(ctx);
+	const historyStore = new CoordinatorHistoryStore(ctx.storage);
+	const mutationStore = new CoordinatorMutationStore(ctx.storage);
 	const socketService = new CoordinatorSocketService(ctx);
 	const blobRepository = new BlobRepository(env.SYNC_BLOBS);
 	const vaultRepository = new VaultRepository(db);
@@ -23,12 +46,47 @@ export function createCoordinatorRuntime(ctx: DurableObjectState, env: Env) {
 	});
 	const syncStatusRepository = new VaultSyncStatusRepository(env.DB);
 	const syncTokenService = new SyncTokenService(env.SYNC_TOKEN_SECRET);
-	const coordinatorService = new CoordinatorService(
+	const maintenanceScheduler = new CoordinatorMaintenanceScheduler(ctx);
+	const healthSyncService = new HealthSyncService(
+		healthStore,
+		syncStatusRepository,
+		cursorActiveTtlMs,
+		maintenanceScheduler,
+	);
+	const blobSyncService = new BlobSyncService(
 		syncTokenService,
-		stateRepository,
+		blobStore,
+		cursorStore,
+		healthStore,
 		socketService,
 		blobRepository,
-		syncStatusRepository,
+		blobGracePeriodMs,
+		maintenanceScheduler,
+		healthSyncService,
+	);
+	const mutationCommitService = new MutationCommitService(
+		mutationStore,
+		blobStore,
+		cursorStore,
+		blobRepository,
+		blobGracePeriodMs,
+		maintenanceScheduler,
+		healthSyncService,
+	);
+	const entrySyncService = new EntrySyncService(entryStore, cursorStore);
+	const entryHistoryService = new EntryHistoryService(
+		entryStore,
+		historyStore,
+		cursorStore,
+		mutationCommitService,
+		blobSyncService,
+	);
+	const vaultLifecycleService = new VaultLifecycleService(
+		storage,
+		cursorStore,
+		healthStore,
+		socketService,
+		blobRepository,
 		{
 			readInitialVaultLimits: async (vaultId) => {
 				const organizationId = await vaultRepository.readVaultOrganizationId(vaultId);
@@ -41,34 +99,48 @@ export function createCoordinatorRuntime(ctx: DurableObjectState, env: Env) {
 				return policy.limits;
 			},
 		},
+		healthSyncService,
 	);
-	const maintenanceScheduler = new CoordinatorMaintenanceScheduler(ctx, {
-		blob_gc: async (now) => {
-			return await coordinatorService.runGc(undefined, {
-				now,
-				scheduleHealthFlush: true,
-				scheduleNextGc: false,
-			});
-		},
-		health_summary_flush: async (now) => {
-			await coordinatorService.flushHealthSummary({
-				now,
-				throwOnError: true,
-			});
-			return null;
-		},
+	const socketConnectionService = new CoordinatorSocketConnectionService(
+		socketService,
+		syncTokenService,
+		vaultLifecycleService,
+		healthSyncService,
+	);
+	const maintenanceService = new CoordinatorMaintenanceService(
+		maintenanceScheduler,
+		blobSyncService,
+		healthSyncService,
+		vaultLifecycleService,
+	);
+	const application = new CoordinatorService({
+		blobSyncService,
+		entryHistoryService,
+		entrySyncService,
+		healthSyncService,
+		maintenanceService,
+		mutationCommitService,
+		socketConnectionService,
+		vaultLifecycleService,
 	});
-	coordinatorService.setMaintenanceScheduler(maintenanceScheduler);
+	const socketMessageHandler = new CoordinatorControlMessageHandler(
+		socketService,
+		cursorStore,
+		healthStore,
+		application,
+		healthSyncService,
+	);
 	const ready = ctx.blockConcurrencyWhile(async () => {
-		await stateRepository.migrate();
+		await storage.migrate();
 		await maintenanceScheduler.ensureArmed();
 	});
 
 	return {
 		app: createCoordinatorApp({
-			coordinatorService,
+			useCases: application,
 		}),
-		coordinatorService,
+		useCases: application,
+		socketMessageHandler,
 		ready,
 	};
 }

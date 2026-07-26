@@ -372,6 +372,12 @@ export type SocketSession = {
 	wantsStorageStatus: boolean;
 };
 
+export type VaultStateLimits = {
+	storageLimitBytes: number;
+	maxFileSizeBytes: number;
+	versionHistoryRetentionDays: number;
+};
+
 export type CommitMutationResult = {
 	message: ServerControlMessage;
 	broadcastCursor: number | null;
@@ -390,4 +396,9 @@ export type RestoreEntryVersionResult = {
 export type RestoreEntryVersionsResult = {
 	message: EntryVersionsRestoredMessage;
 	broadcastCursor: number | null;
+};
+
+export type DeletedEntriesPurgeResult = {
+	message: DeletedEntriesPurgedMessage;
+	candidateBlobIds: string[];
 };

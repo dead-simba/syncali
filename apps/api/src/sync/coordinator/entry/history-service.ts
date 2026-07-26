@@ -1,10 +1,7 @@
 import { apiError } from "../../../errors";
 import type {
-	CommitMutationMessage,
-	CommitMutationResult,
 	CommitMutationsMessage,
-	CommitMutationsResult,
-	DeletedEntriesPurgedMessage,
+	DeletedEntriesPurgeResult,
 	DeletedEntriesListedMessage,
 	EntryVersionsListedMessage,
 	ListDeletedEntriesMessage,
@@ -17,37 +14,37 @@ import type {
 	RestoreEntryVersionsResult,
 	SocketSession,
 } from "../types";
-import type { CoordinatorStateRepository } from "../state-repository";
+import type {
+	EntryHistoryStore,
+	EntryStateStore,
+	MutationCommitter,
+	PurgedBlobCollector,
+	VaultStateStore,
+} from "../ports";
 
 const MAX_HISTORY_BATCH = 100;
 const MAX_DELETED_ENTRIES_BATCH = 100;
 
 export class EntryHistoryService {
 	constructor(
-		private readonly stateRepository: CoordinatorStateRepository,
-		private readonly readVersionHistoryRetentionMs: (vaultId: string) => Promise<number>,
-		private readonly commitMutation: (
-			session: SocketSession,
-			message: CommitMutationMessage,
-			options?: { forcedHistoryBefore?: "before_restore" | null },
-		) => Promise<CommitMutationResult>,
-		private readonly commitMutations: (
-			session: SocketSession,
-			message: CommitMutationsMessage,
-			options?: { forcedHistoryBefore?: "before_restore" | null },
-		) => Promise<CommitMutationsResult>,
+		private readonly entryStore: EntryStateStore,
+		private readonly historyStore: EntryHistoryStore,
+		private readonly vaultStateStore: Pick<
+			VaultStateStore,
+			"currentCursor" | "readVersionHistoryRetentionDays"
+		>,
+		private readonly mutationCommitter: MutationCommitter,
+		private readonly purgedBlobCollector: PurgedBlobCollector,
 	) {}
 
 	async listDeletedEntries(
 		session: SocketSession,
 		message: ListDeletedEntriesMessage,
 	): Promise<DeletedEntriesListedMessage> {
-		const versionHistoryRetentionMs = await this.readVersionHistoryRetentionMs(
-			session.vaultId,
-		);
+		const versionHistoryRetentionMs = this.readVersionHistoryRetentionMs();
 		const retentionStart = Date.now() - versionHistoryRetentionMs;
 		const effectiveLimit = Math.min(message.limit, MAX_DELETED_ENTRIES_BATCH);
-		const entries = this.stateRepository.listDeletedEntries(
+		const entries = this.entryStore.listDeletedEntries(
 			message.before,
 			retentionStart,
 			effectiveLimit + 1,
@@ -80,12 +77,10 @@ export class EntryHistoryService {
 		session: SocketSession,
 		message: ListEntryVersionsMessage,
 	): Promise<EntryVersionsListedMessage> {
-		const versionHistoryRetentionMs = await this.readVersionHistoryRetentionMs(
-			session.vaultId,
-		);
+		const versionHistoryRetentionMs = this.readVersionHistoryRetentionMs();
 		const retentionStart = Date.now() - versionHistoryRetentionMs;
 		const effectiveLimit = Math.min(message.limit, MAX_HISTORY_BATCH);
-		const versions = this.stateRepository.listEntryVersions(
+		const versions = this.historyStore.listEntryVersions(
 			message.entryId,
 			message.before,
 			retentionStart,
@@ -93,7 +88,7 @@ export class EntryHistoryService {
 		);
 		const hasMore = versions.length > effectiveLimit;
 		const page = hasMore ? versions.slice(0, effectiveLimit) : versions;
-		if (page.length === 0 && !this.stateRepository.readEntry(message.entryId)) {
+		if (page.length === 0 && !this.entryStore.readEntry(message.entryId)) {
 			throw apiError(404, "not_found", "entry history not found");
 		}
 		const last = page.at(-1);
@@ -126,17 +121,15 @@ export class EntryHistoryService {
 		session: SocketSession,
 		message: RestoreEntryVersionMessage,
 	): Promise<RestoreEntryVersionResult> {
-		const versionHistoryRetentionMs = await this.readVersionHistoryRetentionMs(
-			session.vaultId,
-		);
+		const versionHistoryRetentionMs = this.readVersionHistoryRetentionMs();
 		const retentionStart = Date.now() - versionHistoryRetentionMs;
 
-		const current = this.stateRepository.readEntry(message.entryId);
+		const current = this.entryStore.readEntry(message.entryId);
 		if (!current) {
 			throw apiError(404, "not_found", "entry not found");
 		}
 
-		const target = this.stateRepository.readEntryVersion(
+		const target = this.historyStore.readEntryVersion(
 			message.entryId,
 			message.versionId,
 			retentionStart,
@@ -161,7 +154,7 @@ export class EntryHistoryService {
 			);
 		}
 
-		const committed = await this.commitMutation(
+		const committed = await this.mutationCommitter.commitMutation(
 			session,
 			{
 				type: "commit_mutation",
@@ -210,9 +203,7 @@ export class EntryHistoryService {
 		session: SocketSession,
 		message: RestoreEntryVersionsMessage,
 	): Promise<RestoreEntryVersionsResult> {
-		const versionHistoryRetentionMs = await this.readVersionHistoryRetentionMs(
-			session.vaultId,
-		);
+		const versionHistoryRetentionMs = this.readVersionHistoryRetentionMs();
 		const retentionStart = Date.now() - versionHistoryRetentionMs;
 		const results: RestoreEntryVersionBatchResult[] = [];
 		const mutationIndexes: number[] = [];
@@ -220,13 +211,13 @@ export class EntryHistoryService {
 		const mutations: CommitMutationsMessage["mutations"] = [];
 
 		for (const restore of message.restores) {
-			const current = this.stateRepository.readEntry(restore.entryId);
+			const current = this.entryStore.readEntry(restore.entryId);
 			if (!current) {
 				results.push(rejectedRestore(restore, "not_found", "entry not found"));
 				continue;
 			}
 
-			const target = this.stateRepository.readEntryVersion(
+			const target = this.historyStore.readEntryVersion(
 				restore.entryId,
 				restore.versionId,
 				retentionStart,
@@ -286,14 +277,14 @@ export class EntryHistoryService {
 				message: {
 					type: "entry_versions_restored",
 					requestId: message.requestId,
-					cursor: this.stateRepository.currentCursor(),
+					cursor: this.vaultStateStore.currentCursor(),
 					results,
 				},
 				broadcastCursor: null,
 			};
 		}
 
-		const committed = await this.commitMutations(
+		const committed = await this.mutationCommitter.commitMutations(
 			session,
 			{
 				type: "commit_mutations",
@@ -349,13 +340,15 @@ export class EntryHistoryService {
 		session: SocketSession,
 		message: PurgeDeletedEntriesMessage,
 	): Promise<DeletedEntriesPurgeResult> {
-		const versionHistoryRetentionMs = await this.readVersionHistoryRetentionMs(
-			session.vaultId,
-		);
+		const versionHistoryRetentionMs = this.readVersionHistoryRetentionMs();
 		const retentionStart = Date.now() - versionHistoryRetentionMs;
-		const purged = this.stateRepository.purgeDeletedEntryVersions(
+		const purged = this.historyStore.purgeDeletedEntryVersions(
 			message.entries,
 			retentionStart,
+		);
+		await this.purgedBlobCollector.collectPurgedBlobs(
+			session.vaultId,
+			purged.candidateBlobIds,
 		);
 
 		return {
@@ -367,12 +360,13 @@ export class EntryHistoryService {
 			candidateBlobIds: purged.candidateBlobIds,
 		};
 	}
+
+	private readVersionHistoryRetentionMs(): number {
+		return this.vaultStateStore.readVersionHistoryRetentionDays() * DAY_IN_MS;
+	}
 }
 
-export type DeletedEntriesPurgeResult = {
-	message: DeletedEntriesPurgedMessage;
-	candidateBlobIds: string[];
-};
+const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
 function rejectedRestore(
 	restore: RestoreEntryVersionsMessage["restores"][number],

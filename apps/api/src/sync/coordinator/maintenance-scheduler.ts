@@ -11,13 +11,23 @@ type MaintenanceJob = {
 	retryCount: number;
 };
 
-type MaintenanceJobHandler = (now: number) => Promise<number | null>;
+export type MaintenanceJobHandler = (now: number) => Promise<number | null>;
+
+export type MaintenanceJobHandlers = Record<
+	MaintenanceJobKey,
+	MaintenanceJobHandler
+>;
+
+export interface MaintenanceScheduler {
+	defer(key: MaintenanceJobKey, dueAt: number, now?: number): Promise<void>;
+}
+
+export interface MaintenanceRunner {
+	drain(handlers: MaintenanceJobHandlers, now?: number): Promise<void>;
+}
 
 export class CoordinatorMaintenanceScheduler {
-	constructor(
-		private readonly ctx: DurableObjectState,
-		private readonly handlers: Record<MaintenanceJobKey, MaintenanceJobHandler>,
-	) {}
+	constructor(private readonly ctx: DurableObjectState) {}
 
 	async defer(
 		key: MaintenanceJobKey,
@@ -45,7 +55,7 @@ export class CoordinatorMaintenanceScheduler {
 		await this.rearm();
 	}
 
-	async drain(now = Date.now()): Promise<void> {
+	async drain(handlers: MaintenanceJobHandlers, now = Date.now()): Promise<void> {
 		for (let i = 0; i < MAX_DRAINED_JOBS_PER_ALARM; i += 1) {
 			const job = this.readNextDueJob(now);
 			if (!job) {
@@ -53,7 +63,7 @@ export class CoordinatorMaintenanceScheduler {
 			}
 
 			try {
-				const nextDueAt = await this.handlers[job.key](now);
+				const nextDueAt = await handlers[job.key](now);
 				if (nextDueAt === null) {
 					this.deleteJob(job.key);
 				} else {

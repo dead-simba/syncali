@@ -1,5 +1,4 @@
 import { selectSyncWebSocketProtocol } from "../../access/token";
-import type { SyncTokenService } from "../../access/token-service";
 import type {
 	PolicyUpdatedMessage,
 	ServerControlMessage,
@@ -12,28 +11,16 @@ export class CoordinatorSocketService {
 
 	async openSocket(
 		request: Request,
-		vaultId: string,
-		syncTokenService: SyncTokenService,
-		ensureVaultState: (vaultId: string) => Promise<void>,
-		scheduleHealthSummaryFlush: (now?: number) => Promise<void>,
+		socketSession: SocketSession,
 	): Promise<Response> {
-		const claims = await syncTokenService.requireSyncToken(request, vaultId);
-		await ensureVaultState(claims.vaultId);
 		const selectedProtocol = selectSyncWebSocketProtocol(request);
 		const socketPair = new WebSocketPair();
 		const client = socketPair[0];
 		const server = socketPair[1];
 
 		this.acceptWebSocket(server);
-		const socketSession = {
-			userId: claims.sub,
-			localVaultId: claims.localVaultId,
-			vaultId: claims.vaultId,
-			wantsStorageStatus: false,
-		} satisfies SocketSession;
 		this.attachSocketSession(server, socketSession);
 		this.closeSupersededSockets(server, socketSession);
-		await scheduleHealthSummaryFlush();
 
 		return new Response(null, {
 			status: 101,

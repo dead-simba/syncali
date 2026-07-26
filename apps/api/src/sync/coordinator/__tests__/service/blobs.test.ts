@@ -6,7 +6,7 @@ import type { SyncTokenService } from "../../../access/token-service";
 import type { BlobRepository } from "../../../blob/repository";
 import {
 	createCoordinatorService,
-	createMockCoordinatorStateRepository,
+	createTestCoordinatorState,
 	socketServiceMock,
 } from "./helpers";
 
@@ -22,10 +22,10 @@ describe("coordinator blob lifecycle", () => {
 				exp: 200,
 			})),
 		} as unknown as SyncTokenService;
-		const stateRepository = createMockCoordinatorStateRepository({
+		const stateRepository = createTestCoordinatorState({
 			readBlob: vi.fn(() => ({
 				blob_id: "blob-1",
-				state: "live",
+				state: "live" as const,
 				size_bytes: 42,
 				created_at: 1,
 				last_uploaded_at: 1,
@@ -64,7 +64,7 @@ describe("coordinator blob lifecycle", () => {
 				exp: 200,
 			})),
 		} as unknown as SyncTokenService;
-		const stateRepository = createMockCoordinatorStateRepository({
+		const stateRepository = createTestCoordinatorState({
 			stageBlob: vi.fn(async () => {
 				throw new DomainError("quota_exceeded", "storage limit reached");
 			}),
@@ -108,7 +108,7 @@ describe("coordinator blob lifecycle", () => {
 				exp: 200,
 			})),
 		} as unknown as SyncTokenService;
-		const stateRepository = createMockCoordinatorStateRepository({
+		const stateRepository = createTestCoordinatorState({
 			stageBlob: vi.fn(async () => {
 				throw new DomainError("blob_size_changed", "blob changed size");
 			}),

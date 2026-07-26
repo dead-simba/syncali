@@ -26,10 +26,7 @@ describe("CoordinatorMaintenanceScheduler", () => {
 			updatedAt: 0,
 		};
 		const ctx = createTestDurableObjectState(job);
-		const scheduler = new CoordinatorMaintenanceScheduler(ctx, {
-			blob_gc: vi.fn(async () => null),
-			health_summary_flush: vi.fn(async () => null),
-		});
+		const scheduler = new CoordinatorMaintenanceScheduler(ctx);
 
 		await scheduler.defer("blob_gc", 30 * 60 * 1000 + 1, 1_000);
 
@@ -51,10 +48,7 @@ describe("CoordinatorMaintenanceScheduler", () => {
 			updatedAt: 0,
 		};
 		const ctx = createTestDurableObjectState(job, 10_000);
-		const scheduler = new CoordinatorMaintenanceScheduler(ctx, {
-			blob_gc: vi.fn(async () => null),
-			health_summary_flush: vi.fn(async () => null),
-		});
+		const scheduler = new CoordinatorMaintenanceScheduler(ctx);
 
 		await scheduler.rearm();
 
@@ -72,10 +66,7 @@ describe("CoordinatorMaintenanceScheduler", () => {
 			updatedAt: 500,
 		};
 		const ctx = createTestDurableObjectState(job, 10_000);
-		const scheduler = new CoordinatorMaintenanceScheduler(ctx, {
-			blob_gc: vi.fn(async () => null),
-			health_summary_flush: vi.fn(async () => null),
-		});
+		const scheduler = new CoordinatorMaintenanceScheduler(ctx);
 
 		await scheduler.defer("health_summary_flush", 12_000, 1_000);
 
@@ -98,10 +89,7 @@ describe("CoordinatorMaintenanceScheduler", () => {
 			updatedAt: 500,
 		};
 		const ctx = createTestDurableObjectState(job, bucket);
-		const scheduler = new CoordinatorMaintenanceScheduler(ctx, {
-			blob_gc: vi.fn(async () => null),
-			health_summary_flush: vi.fn(async () => null),
-		});
+		const scheduler = new CoordinatorMaintenanceScheduler(ctx);
 
 		await scheduler.defer("blob_gc", 45 * 60 * 1000, 1_000);
 
@@ -126,14 +114,15 @@ describe("CoordinatorMaintenanceScheduler", () => {
 		const ctx = createTestDurableObjectState(job);
 		const error = new Error("d1 unavailable");
 		const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
-		const scheduler = new CoordinatorMaintenanceScheduler(ctx, {
+		const scheduler = new CoordinatorMaintenanceScheduler(ctx);
+		const handlers = {
 			blob_gc: vi.fn(async () => {
 				throw error;
 			}),
 			health_summary_flush: vi.fn(async () => null),
-		});
+		};
 
-		await scheduler.drain(now);
+		await scheduler.drain(handlers, now);
 
 		expect(job).toMatchObject({
 			dueAt: 61_000,

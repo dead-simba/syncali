@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
 	createCoordinatorService,
 	createMockCoordinatorSocketService,
-	createMockCoordinatorStateRepository,
+	createTestCoordinatorState,
 	testSocketSession,
 	testWebSocket,
 } from "./helpers";
@@ -16,7 +16,7 @@ describe("coordinator entry-state sync", () => {
 			readSocketSession: vi.fn(() => session),
 			sendSocketMessage: vi.fn(),
 		});
-		const stateRepository = createMockCoordinatorStateRepository({
+		const stateRepository = createTestCoordinatorState({
 			currentCursor: vi.fn(() => 10),
 			countEntryStates: vi.fn(() => 1),
 			listEntryStates: vi.fn(() => [
@@ -95,7 +95,7 @@ describe("coordinator entry-state sync", () => {
 			sendSocketMessage: vi.fn(),
 		});
 		const listEntryStates = vi.fn();
-		const stateRepository = createMockCoordinatorStateRepository({
+		const stateRepository = createTestCoordinatorState({
 			currentCursor: vi.fn(() => 10),
 			listEntryStates,
 		});
