@@ -4,4 +4,6 @@
 
 ## Changed
 
+- Maintenance release with no user-facing changes.
+
 ## Fixed
