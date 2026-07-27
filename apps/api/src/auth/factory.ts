@@ -23,6 +23,9 @@ export type AuthConfig = {
 	plugins?: BetterAuthPlugin[];
 };
 
+/** Auth session lifetime for signed-in clients (plugin bearer token, cookies). */
+const SESSION_EXPIRES_IN_SECONDS = 60 * 60 * 24 * 30;
+
 export function createAuth(database: D1Database, config: AuthConfig) {
 	const db = createDb(database);
 	const emailVerification = createEmailVerificationConfig(config);
@@ -38,6 +41,9 @@ export function createAuth(database: D1Database, config: AuthConfig) {
 			requireEmailVerification: !config.selfHosted && !config.devMode,
 		},
 		emailVerification,
+		session: {
+			expiresIn: SESSION_EXPIRES_IN_SECONDS,
+		},
 		databaseHooks: {
 			user: {
 				create: {
