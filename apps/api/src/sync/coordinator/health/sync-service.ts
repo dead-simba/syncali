@@ -1,5 +1,6 @@
 import type { MaintenanceScheduler } from "../maintenance-scheduler";
 import type { HealthStateStore } from "../ports";
+import { nextHealthSummaryFlushAt } from "../store/health-store";
 import type { VaultSyncStatusSummary } from "../../health/types";
 
 const DEFAULT_HEALTH_SUMMARY_FLUSH_DELAY_MS = 10 * 60 * 1000;
@@ -30,21 +31,30 @@ export class HealthSyncService {
 
 	async flushSummary(
 		options: { force?: boolean; now?: number; throwOnError?: boolean } = {},
-	): Promise<void> {
+	): Promise<number | null> {
 		if (!this.syncStatusRepository) {
-			return;
+			return null;
 		}
 
 		const now = options.now ?? Date.now();
 		const summary = this.healthStore.readHealthSummary(now, this.cursorActiveTtlMs);
 		if (!summary) {
-			return;
+			return null;
 		}
 
 		try {
 			await this.syncStatusRepository.upsert(summary, now);
 			this.healthStore.recordHealthSummaryFlushed(now);
-			this.scheduledFlushAt = null;
+			const nextDueAt = nextHealthSummaryFlushAt(summary, now);
+			this.scheduledFlushAt = nextDueAt;
+			if (nextDueAt !== null) {
+				await this.maintenanceScheduler.defer(
+					"health_summary_flush",
+					nextDueAt,
+					now,
+				);
+			}
+			return nextDueAt;
 		} catch (error) {
 			this.healthStore.recordHealthSummaryFlushFailed(error, now);
 			this.scheduledFlushAt = null;
@@ -52,6 +62,7 @@ export class HealthSyncService {
 				throw error;
 			}
 			await this.maintenanceScheduler.defer("health_summary_flush", now, now);
+			return null;
 		}
 	}
 }

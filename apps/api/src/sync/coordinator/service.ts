@@ -75,7 +75,7 @@ export interface EntrySyncUseCases {
 
 export interface HealthUseCases {
 	scheduleSummaryFlush(now?: number): Promise<void>;
-	flushSummary(options?: HealthFlushOptions): Promise<void>;
+	flushSummary(options?: HealthFlushOptions): Promise<number | null>;
 }
 
 export interface MaintenanceUseCases {

@@ -16,7 +16,7 @@ export interface HealthMaintenanceUseCases {
 		force?: boolean;
 		now?: number;
 		throwOnError?: boolean;
-	}): Promise<void>;
+	}): Promise<number | null>;
 }
 
 export interface VaultPurgeState {
@@ -43,13 +43,11 @@ export class CoordinatorMaintenanceService {
 					scheduleHealthFlush: true,
 					scheduleNextGc: false,
 				}),
-			health_summary_flush: async (now) => {
+			health_summary_flush: async (now) =>
 				await this.healthSyncService.flushSummary({
 					now,
 					throwOnError: true,
-				});
-				return null;
-			},
+				}),
 		});
 	}
 }

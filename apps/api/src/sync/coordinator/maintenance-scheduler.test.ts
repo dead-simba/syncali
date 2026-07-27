@@ -148,6 +148,42 @@ describe("CoordinatorMaintenanceScheduler", () => {
 			}),
 		);
 	});
+
+	it("reschedules a due job from the handler nextDueAt even when defer would no-op", async () => {
+		const now = 61_000;
+		const nextDueAt = now + 24 * 60 * 60 * 1000;
+		const job: TestJob = {
+			key: "health_summary_flush",
+			dueAt: now - 1,
+			retryCount: 0,
+			lastError: null,
+			lastErrorAt: null,
+			updatedAt: now - 1,
+		};
+		const ctx = createTestDurableObjectState(job);
+		const scheduler = new CoordinatorMaintenanceScheduler(ctx);
+		const deferSpy = vi.spyOn(scheduler, "defer");
+		const handlers = {
+			blob_gc: vi.fn(async () => null),
+			health_summary_flush: vi.fn(async () => {
+				// Mirrors HealthSyncService: defer is a no-op while the overdue
+				// job still exists; drain must persist nextDueAt via rescheduleJob.
+				await scheduler.defer("health_summary_flush", nextDueAt, now);
+				return nextDueAt;
+			}),
+		};
+
+		await scheduler.drain(handlers, now);
+
+		expect(deferSpy).toHaveBeenCalledWith("health_summary_flush", nextDueAt, now);
+		expect(job).toMatchObject({
+			key: "health_summary_flush",
+			dueAt: nextDueAt,
+			retryCount: 0,
+			updatedAt: now,
+		});
+		expect(ctx.storage.setAlarm).toHaveBeenCalledWith(nextDueAt);
+	});
 });
 
 function createTestDurableObjectState(
@@ -175,8 +211,16 @@ function createTestDurableObjectState(
 
 				if (query.includes("INSERT INTO maintenance_jobs")) {
 					job.key = String(params[0]);
-					job.dueAt =
-						job.dueAt === 0 ? Number(params[1]) : Math.min(job.dueAt, Number(params[1]));
+					if (query.includes("due_at = min(")) {
+						job.dueAt =
+							job.dueAt === 0
+								? Number(params[1])
+								: Math.min(job.dueAt, Number(params[1]));
+					} else {
+						job.dueAt = Number(params[1]);
+						job.lastError = null;
+						job.lastErrorAt = null;
+					}
 					job.retryCount = 0;
 					job.updatedAt = Number(params[2]);
 					return { toArray: () => [] };
@@ -185,21 +229,31 @@ function createTestDurableObjectState(
 				if (query.includes("WHERE due_at <= ?")) {
 					return {
 						toArray: () =>
-							job.dueAt <= Number(params[0])
-								? [
+							job.dueAt === 0 || job.dueAt > Number(params[0])
+								? []
+								: [
 										{
 											key: job.key,
 											due_at: job.dueAt,
 											retry_count: job.retryCount,
 										},
-									]
-								: [],
+									],
 					};
+				}
+
+				if (query.includes("DELETE FROM maintenance_jobs")) {
+					if (job.key === params[0]) {
+						job.dueAt = 0;
+						job.retryCount = 0;
+						job.lastError = null;
+						job.lastErrorAt = null;
+					}
+					return { toArray: () => [] };
 				}
 
 				if (query.includes("SELECT due_at")) {
 					return {
-						toArray: () => [{ due_at: job.dueAt }],
+						toArray: () => (job.dueAt === 0 ? [] : [{ due_at: job.dueAt }]),
 					};
 				}
 

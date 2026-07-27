@@ -4,9 +4,9 @@ import type {
 	VaultSyncStatusSummary,
 } from "../../health/types";
 
-const STAGED_BLOB_STALE_MS = 60 * 60 * 1000;
-const PENDING_DELETE_STALE_MS = 24 * 60 * 60 * 1000;
-const ACTIVE_WITHOUT_RECENT_COMMIT_MS = 24 * 60 * 60 * 1000;
+export const STAGED_BLOB_STALE_MS = 60 * 60 * 1000;
+export const PENDING_DELETE_STALE_MS = 24 * 60 * 60 * 1000;
+export const ACTIVE_WITHOUT_RECENT_COMMIT_MS = 24 * 60 * 60 * 1000;
 const PENDING_DELETE_BACKLOG_WARNING_COUNT = 100;
 const STORAGE_NEAR_LIMIT_RATIO = 0.8;
 
@@ -196,14 +196,14 @@ function evaluateHealth(
 
 	if (
 		summary.oldestStagedBlobAgeMs !== null &&
-		summary.oldestStagedBlobAgeMs > STAGED_BLOB_STALE_MS
+		summary.oldestStagedBlobAgeMs >= STAGED_BLOB_STALE_MS
 	) {
 		warning("staged_blob_stale");
 	}
 
 	if (
 		summary.oldestPendingDeleteAgeMs !== null &&
-		summary.oldestPendingDeleteAgeMs > PENDING_DELETE_STALE_MS
+		summary.oldestPendingDeleteAgeMs >= PENDING_DELETE_STALE_MS
 	) {
 		warning("pending_delete_stale");
 	}
@@ -215,12 +215,71 @@ function evaluateHealth(
 	if (
 		summary.activeLocalVaultCount > 0 &&
 		(summary.lastCommitAt === null ||
-			now - summary.lastCommitAt > ACTIVE_WITHOUT_RECENT_COMMIT_MS)
+			now - summary.lastCommitAt >= ACTIVE_WITHOUT_RECENT_COMMIT_MS)
 	) {
 		warning("active_without_recent_commit");
 	}
 
 	return { status, reasons };
+}
+
+/**
+ * Earliest future time when a time-based health reason can change.
+ * Already-fired thresholds are skipped so flushes do not reschedule forever.
+ */
+export function nextHealthSummaryFlushAt(
+	summary: Pick<
+		VaultSyncStatusSummary,
+		| "activeLocalVaultCount"
+		| "lastCommitAt"
+		| "oldestStagedBlobAgeMs"
+		| "oldestPendingDeleteAgeMs"
+	>,
+	now: number,
+): number | null {
+	const candidates: number[] = [];
+
+	if (summary.activeLocalVaultCount > 0 && summary.lastCommitAt !== null) {
+		const commitWarningAt =
+			summary.lastCommitAt + ACTIVE_WITHOUT_RECENT_COMMIT_MS;
+		if (commitWarningAt > now) {
+			candidates.push(commitWarningAt);
+		}
+	}
+
+	const stagedWarningAt = futureDueFromAge(
+		now,
+		summary.oldestStagedBlobAgeMs,
+		STAGED_BLOB_STALE_MS,
+	);
+	if (stagedWarningAt !== null) {
+		candidates.push(stagedWarningAt);
+	}
+
+	const pendingDeleteWarningAt = futureDueFromAge(
+		now,
+		summary.oldestPendingDeleteAgeMs,
+		PENDING_DELETE_STALE_MS,
+	);
+	if (pendingDeleteWarningAt !== null) {
+		candidates.push(pendingDeleteWarningAt);
+	}
+
+	if (candidates.length === 0) {
+		return null;
+	}
+	return Math.min(...candidates);
+}
+
+function futureDueFromAge(
+	now: number,
+	ageMs: number | null,
+	thresholdMs: number,
+): number | null {
+	if (ageMs === null || ageMs >= thresholdMs) {
+		return null;
+	}
+	return now + (thresholdMs - ageMs);
 }
 
 function nullableNumber(value: number | null): number | null {
