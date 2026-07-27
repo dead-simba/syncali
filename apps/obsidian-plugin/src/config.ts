@@ -12,6 +12,12 @@ export function getDefaultApiBaseUrl(): string {
   return API_BASE_URL;
 }
 
+export type SynchServerDeployment = "official_cloud" | "self_hosted";
+
+export function getServerDeployment(apiBaseUrl: string): SynchServerDeployment {
+  return apiBaseUrl === getDefaultApiBaseUrl() ? "official_cloud" : "self_hosted";
+}
+
 export function normalizeApiBaseUrl(value: unknown, fallback: string): string {
   if (typeof value !== "string") {
     return fallback;

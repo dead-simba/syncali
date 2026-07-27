@@ -1,6 +1,6 @@
 import { App, Plugin, PluginSettingTab, Setting } from "obsidian";
 
-import { getDefaultApiBaseUrl } from "../config";
+import { getServerDeployment } from "../config";
 import { t } from "../i18n";
 import type { SynchUiEvent } from "../plugin/ui-events";
 import type { SynchSettingsController } from "./controller";
@@ -76,7 +76,8 @@ export class SynchSettingTab extends PluginSettingTab {
     this.syncStatusControls = null;
     const hasConnectedRemoteVault = this.controller.hasConnectedRemoteVault();
     const hasAuthenticatedSession = this.controller.hasAuthenticatedSession();
-    const usesDefaultApiBaseUrl = this.controller.getApiBaseUrl() === getDefaultApiBaseUrl();
+    const isOfficialCloud =
+      getServerDeployment(this.controller.getApiBaseUrl()) === "official_cloud";
     const authReadiness = this.controller.getAuthReadiness();
     const isDeviceLoginInProgress = this.controller.isDeviceLoginInProgress();
     const canChangeApiBaseUrl =
@@ -84,7 +85,7 @@ export class SynchSettingTab extends PluginSettingTab {
       !isDeviceLoginInProgress &&
       !hasConnectedRemoteVault;
 
-    void this.controller.ensurePluginUpdateCheck();
+    void this.controller.ensureCommunityPluginUpdateCheck();
     renderSettingsHeading(containerEl, this.controller);
 
     if (authReadiness.state === "pending_network") {
@@ -92,7 +93,7 @@ export class SynchSettingTab extends PluginSettingTab {
       return;
     }
 
-    if (hasAuthenticatedSession && usesDefaultApiBaseUrl) {
+    if (hasAuthenticatedSession && isOfficialCloud) {
       void this.controller.ensureSubscriptionStatusCheck();
     }
 
@@ -114,7 +115,7 @@ export class SynchSettingTab extends PluginSettingTab {
       () => this.refresh(),
     );
 
-    if (hasAuthenticatedSession && usesDefaultApiBaseUrl) {
+    if (hasAuthenticatedSession && isOfficialCloud) {
       renderSubscriptionSetting(containerEl, this.controller, () => this.refresh());
     }
 
@@ -125,7 +126,7 @@ export class SynchSettingTab extends PluginSettingTab {
         hasConnectedRemoteVault,
         isDeviceLoginInProgress,
         showSelfHostedServerUrl:
-          this.showSelfHostedServerUrl ?? !usesDefaultApiBaseUrl,
+          this.showSelfHostedServerUrl ?? !isOfficialCloud,
         onShowSelfHostedServerUrlChange: (value) => {
           this.showSelfHostedServerUrl = value;
           this.refresh();

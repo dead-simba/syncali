@@ -5,11 +5,30 @@ import {
   resetObsidianMocks,
   setRequestUrlMock,
 } from "../test-stubs/obsidian";
+import { DEFAULT_SYNC_FILE_RULES } from "../sync/core/file-rules";
+import { DEFAULT_VAULT_CONFIG_SYNC_RULES } from "../sync/core/vault-config-rules";
+import { SYNCH_SETTINGS_KEY, type SynchPluginSettings } from "../settings/schema";
 import { SynchPluginController } from "./plugin-controller";
 
 const TestPlugin = Plugin as unknown as new () => Plugin;
 
-describe("SynchPluginController plugin update check", () => {
+function createPluginWithSettings(settings: SynchPluginSettings): Plugin & {
+  savedData: Record<string, unknown> | null;
+} {
+  const plugin = new TestPlugin() as Plugin & {
+    savedData: Record<string, unknown> | null;
+  };
+  plugin.savedData = null;
+  plugin.loadData = async () => ({
+    [SYNCH_SETTINGS_KEY]: settings,
+  });
+  plugin.saveData = async (value: unknown) => {
+    plugin.savedData = value as Record<string, unknown>;
+  };
+  return plugin;
+}
+
+describe("SynchPluginController community plugin update check", () => {
   beforeEach(() => {
     resetObsidianMocks();
   });
@@ -33,10 +52,10 @@ describe("SynchPluginController plugin update check", () => {
       refreshUi: vi.fn(),
     });
 
-    const firstCheck = controller.ensurePluginUpdateCheck();
-    const secondCheck = controller.ensurePluginUpdateCheck();
+    const firstCheck = controller.ensureCommunityPluginUpdateCheck();
+    const secondCheck = controller.ensureCommunityPluginUpdateCheck();
 
-    expect(controller.getPluginUpdateStatus()).toEqual({
+    expect(controller.getCommunityPluginUpdateStatus()).toEqual({
       state: "checking",
       currentVersion: "0.0.1",
     });
@@ -49,7 +68,7 @@ describe("SynchPluginController plugin update check", () => {
     await Promise.all([firstCheck, secondCheck]);
 
     expect(request).toHaveBeenCalledTimes(1);
-    expect(controller.getPluginUpdateStatus()).toEqual({
+    expect(controller.getCommunityPluginUpdateStatus()).toEqual({
       state: "update_available",
       currentVersion: "0.0.1",
       latestVersion: "0.0.2",
@@ -68,9 +87,9 @@ describe("SynchPluginController plugin update check", () => {
       refreshUi: vi.fn(),
     });
 
-    await controller.ensurePluginUpdateCheck();
+    await controller.ensureCommunityPluginUpdateCheck();
 
-    expect(controller.getPluginUpdateStatus()).toEqual({
+    expect(controller.getCommunityPluginUpdateStatus()).toEqual({
       state: "failed",
       currentVersion: "0.0.1",
       error: "GitHub manifest does not contain a version.",
@@ -90,14 +109,52 @@ describe("SynchPluginController plugin update check", () => {
       refreshUi: vi.fn(),
     });
 
-    await controller.ensurePluginUpdateCheck();
-    await controller.ensurePluginUpdateCheck();
+    await controller.ensureCommunityPluginUpdateCheck();
+    await controller.ensureCommunityPluginUpdateCheck();
 
     expect(request).toHaveBeenCalledTimes(1);
 
     vi.setSystemTime(5 * 60 * 1000);
-    await controller.ensurePluginUpdateCheck();
+    await controller.ensureCommunityPluginUpdateCheck();
 
     expect(request).toHaveBeenCalledTimes(2);
+  });
+
+  it("skips community update checks for self-hosted servers", async () => {
+    const request = vi.fn(async (input: unknown) => {
+      const url = String((input as { url?: string }).url ?? "");
+      if (url.includes("/v1/obsidian-plugin/version-check")) {
+        return {
+          status: 200,
+          json: {
+            status: "ok",
+            minVersion: "0.0.9",
+            apiMajor: 1,
+          },
+        };
+      }
+
+      throw new Error(`unexpected request ${url}`);
+    });
+    setRequestUrlMock(request);
+    const controller = new SynchPluginController({
+      plugin: createPluginWithSettings({
+        apiBaseUrl: "https://custom.synch.test",
+        fileRules: DEFAULT_SYNC_FILE_RULES,
+        vaultConfigSync: DEFAULT_VAULT_CONFIG_SYNC_RULES,
+        syncEnabled: true,
+      }),
+      refreshUi: vi.fn(),
+    });
+    await controller.initialize();
+    expect(request).toHaveBeenCalledTimes(1);
+
+    await controller.ensureCommunityPluginUpdateCheck();
+
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(controller.getCommunityPluginUpdateStatus()).toEqual({
+      state: "idle",
+      currentVersion: "0.0.1",
+    });
   });
 });

@@ -2,7 +2,7 @@ import { Notice, type Plugin, TFolder } from "obsidian";
 
 import { BillingClient } from "../billing/client";
 import { buildBillingWebPageUrl } from "../billing/web-url";
-import { getDefaultApiBaseUrl } from "../config";
+import { getServerDeployment } from "../config";
 import { isOfflineLikeError } from "../http/network-status";
 import {
   formatErrorNotice,
@@ -27,7 +27,8 @@ import type {
   SynchEntryVersionCursor,
   SynchFileSizeBlockedFile,
   SynchFileRules,
-  SynchPluginUpdateStatus,
+  SynchCommunityPluginUpdateStatus,
+  SynchServerCompatibilityStatus,
   SynchStorageStatus,
   SynchSubscriptionStatus,
   SynchSyncProgress,
@@ -80,13 +81,16 @@ export class SynchPluginController implements SynchSettingsController {
   private readonly billingClient = new BillingClient();
   private readonly pluginUpdateChecker = new SynchPluginUpdateChecker();
   private readonly serverPluginVersionChecker = new SynchServerPluginVersionChecker();
-  private pluginUpdateCheckPromise: Promise<void> | null = null;
-  private pluginUpdateCheckedAt = 0;
+  private communityPluginUpdateCheckPromise: Promise<void> | null = null;
+  private communityPluginUpdateCheckedAt = 0;
   private subscriptionStatusCheckPromise: Promise<void> | null = null;
   private subscriptionStatusCheckedAt = 0;
-  private pluginUpdateStatus: SynchPluginUpdateStatus = {
+  private communityPluginUpdateStatus: SynchCommunityPluginUpdateStatus = {
     state: "idle",
     currentVersion: this.plugin.manifest.version,
+  };
+  private serverCompatibilityStatus: SynchServerCompatibilityStatus = {
+    state: "idle",
   };
   private subscriptionStatus: SynchSubscriptionStatus = {
     state: "idle",
@@ -199,7 +203,7 @@ export class SynchPluginController implements SynchSettingsController {
   async initialize(): Promise<void> {
     await this.pluginDataStore.initialize();
     await this.initializeSettings();
-    await this.checkServerPluginVersion();
+    await this.checkServerCompatibility();
     this.storedRemoteVaultKeySecret = await readStoredRemoteVaultKeySecret(this.plugin);
     this.storedSyncConnection = await this.syncController.readStoredConnection();
     await this.authManager.initialize();
@@ -237,36 +241,42 @@ export class SynchPluginController implements SynchSettingsController {
       });
   }
 
-  getPluginUpdateStatus(): SynchPluginUpdateStatus {
-    return this.pluginUpdateStatus;
+  getCommunityPluginUpdateStatus(): SynchCommunityPluginUpdateStatus {
+    return this.communityPluginUpdateStatus;
   }
 
-  async ensurePluginUpdateCheck(): Promise<void> {
-    if (this.isPluginUpdateRequired()) {
+  getServerCompatibilityStatus(): SynchServerCompatibilityStatus {
+    return this.serverCompatibilityStatus;
+  }
+
+  async ensureCommunityPluginUpdateCheck(): Promise<void> {
+    if (this.getServerDeployment() !== "official_cloud") {
+      this.clearCommunityPluginUpdateStatus();
       return;
     }
 
-    if (this.pluginUpdateCheckPromise) {
-      await this.pluginUpdateCheckPromise;
+    if (this.communityPluginUpdateCheckPromise) {
+      await this.communityPluginUpdateCheckPromise;
       return;
     }
 
     if (
-      this.pluginUpdateStatus.state !== "idle" &&
-      Date.now() - this.pluginUpdateCheckedAt < PLUGIN_UPDATE_CHECK_INTERVAL_MS
+      this.communityPluginUpdateStatus.state !== "idle" &&
+      Date.now() - this.communityPluginUpdateCheckedAt < PLUGIN_UPDATE_CHECK_INTERVAL_MS
     ) {
       return;
     }
 
-    await this.checkPluginUpdate();
+    await this.checkCommunityPluginUpdate();
   }
 
-  async retryPluginUpdateCheck(): Promise<void> {
-    if (this.isPluginUpdateRequired()) {
+  async retryCommunityPluginUpdateCheck(): Promise<void> {
+    if (this.getServerDeployment() !== "official_cloud") {
+      this.clearCommunityPluginUpdateStatus();
       return;
     }
 
-    await this.checkPluginUpdate();
+    await this.checkCommunityPluginUpdate();
   }
 
   getSubscriptionStatus(): SynchSubscriptionStatus {
@@ -274,7 +284,7 @@ export class SynchPluginController implements SynchSettingsController {
   }
 
   async ensureSubscriptionStatusCheck(): Promise<void> {
-    if (!this.hasAuthenticatedSession() || !this.usesDefaultApiBaseUrl()) {
+    if (!this.hasAuthenticatedSession() || this.getServerDeployment() !== "official_cloud") {
       this.clearSubscriptionStatus();
       return;
     }
@@ -295,7 +305,7 @@ export class SynchPluginController implements SynchSettingsController {
   }
 
   async retrySubscriptionStatusCheck(): Promise<void> {
-    if (!this.hasAuthenticatedSession() || !this.usesDefaultApiBaseUrl()) {
+    if (!this.hasAuthenticatedSession() || this.getServerDeployment() !== "official_cloud") {
       this.clearSubscriptionStatus();
       return;
     }
@@ -477,6 +487,7 @@ export class SynchPluginController implements SynchSettingsController {
 
     const changed = await this.settingsStore.updateApiBaseUrl(value);
     if (changed) {
+      this.clearCommunityPluginUpdateStatus();
       this.refreshUi();
     }
   }
@@ -620,39 +631,40 @@ export class SynchPluginController implements SynchSettingsController {
     this.refreshUi();
   }
 
-  private async checkPluginUpdate(): Promise<void> {
-    if (this.isPluginUpdateRequired()) {
+  private async checkCommunityPluginUpdate(): Promise<void> {
+    if (this.getServerDeployment() !== "official_cloud") {
+      this.clearCommunityPluginUpdateStatus();
       return;
     }
 
-    if (this.pluginUpdateCheckPromise) {
-      await this.pluginUpdateCheckPromise;
+    if (this.communityPluginUpdateCheckPromise) {
+      await this.communityPluginUpdateCheckPromise;
       return;
     }
 
-    this.pluginUpdateStatus = {
+    this.communityPluginUpdateStatus = {
       state: "checking",
       currentVersion: this.plugin.manifest.version,
     };
-    this.pluginUpdateCheckPromise = this.pluginUpdateChecker
+    this.communityPluginUpdateCheckPromise = this.pluginUpdateChecker
       .check(this.plugin.manifest.version)
       .then((status) => {
-        this.pluginUpdateStatus = status;
+        this.communityPluginUpdateStatus = status;
       })
       .catch((error) => {
-        this.pluginUpdateStatus = {
+        this.communityPluginUpdateStatus = {
           state: "failed",
           currentVersion: this.plugin.manifest.version,
           error: error instanceof Error ? error.message : String(error),
         };
       })
       .finally(() => {
-        this.pluginUpdateCheckedAt = Date.now();
-        this.pluginUpdateCheckPromise = null;
+        this.communityPluginUpdateCheckedAt = Date.now();
+        this.communityPluginUpdateCheckPromise = null;
         this.refreshUi();
       });
 
-    await this.pluginUpdateCheckPromise;
+    await this.communityPluginUpdateCheckPromise;
   }
 
   private async checkSubscriptionStatus(): Promise<void> {
@@ -697,8 +709,17 @@ export class SynchPluginController implements SynchSettingsController {
     this.subscriptionStatusCheckPromise = null;
   }
 
-  private usesDefaultApiBaseUrl(): boolean {
-    return this.getApiBaseUrl() === getDefaultApiBaseUrl();
+  private clearCommunityPluginUpdateStatus(): void {
+    this.communityPluginUpdateStatus = {
+      state: "idle",
+      currentVersion: this.plugin.manifest.version,
+    };
+    this.communityPluginUpdateCheckedAt = 0;
+    this.communityPluginUpdateCheckPromise = null;
+  }
+
+  private getServerDeployment() {
+    return getServerDeployment(this.getApiBaseUrl());
   }
 
   private openBillingWebPage(page: "pricing" | "billing"): void {
@@ -877,17 +898,18 @@ export class SynchPluginController implements SynchSettingsController {
     new Notice(formatErrorNotice(error, contextKey));
   }
 
-  private async checkServerPluginVersion(): Promise<void> {
+  private async checkServerCompatibility(): Promise<void> {
     try {
       const status = await this.serverPluginVersionChecker.check(
         this.getApiBaseUrl(),
         this.plugin.manifest.version,
       );
       if (status.apiMajor !== SUPPORTED_SYNCH_API_MAJOR) {
-        this.pluginUpdateStatus = {
-          state: "update_required",
+        this.serverCompatibilityStatus = {
+          state: "incompatible",
           currentVersion: this.plugin.manifest.version,
           minVersion: status.minVersion,
+          apiMajor: status.apiMajor,
           message: t("plugin.serverIncompatible"),
         };
         this.syncController.stopAutoSyncAndMarkNotReady();
@@ -897,10 +919,16 @@ export class SynchPluginController implements SynchSettingsController {
       }
 
       if (status.status !== "update_required") {
+        this.serverCompatibilityStatus = {
+          state: "ok",
+          currentVersion: this.plugin.manifest.version,
+          minVersion: status.minVersion,
+          apiMajor: status.apiMajor,
+        };
         return;
       }
 
-      this.pluginUpdateStatus = {
+      this.serverCompatibilityStatus = {
         state: "update_required",
         currentVersion: this.plugin.manifest.version,
         minVersion: status.minVersion,
@@ -915,15 +943,21 @@ export class SynchPluginController implements SynchSettingsController {
   }
 
   private isPluginUpdateRequired(): boolean {
-    return this.pluginUpdateStatus.state === "update_required";
+    return (
+      this.serverCompatibilityStatus.state === "update_required" ||
+      this.serverCompatibilityStatus.state === "incompatible"
+    );
   }
 
   private getPluginUpdateRequiredMessage(): string {
-    if (this.pluginUpdateStatus.state !== "update_required") {
+    if (
+      this.serverCompatibilityStatus.state !== "update_required" &&
+      this.serverCompatibilityStatus.state !== "incompatible"
+    ) {
       return t("plugin.updateRequiredStatus");
     }
 
-    return this.pluginUpdateStatus.message;
+    return this.serverCompatibilityStatus.message;
   }
 
   private getActiveRemoteVaultKey(): Uint8Array {

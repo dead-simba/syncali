@@ -1,5 +1,5 @@
 import { defaultHttpClient, type HttpClient } from "../http/request";
-import type { SynchPluginUpdateStatus } from "./view-models";
+import type { SynchCommunityPluginUpdateStatus } from "./view-models";
 
 export const SYNCH_PLUGIN_UPDATE_MANIFEST_URL =
   "https://raw.githubusercontent.com/hjinco/synch/main/manifest.json";
@@ -11,7 +11,7 @@ interface RemoteManifest {
 export class SynchPluginUpdateChecker {
   constructor(private readonly httpClient: HttpClient = defaultHttpClient) {}
 
-  async check(currentVersion: string): Promise<SynchPluginUpdateStatus> {
+  async check(currentVersion: string): Promise<SynchCommunityPluginUpdateStatus> {
     const current = parseStrictSemver(currentVersion);
     if (!current) {
       throw new Error(`Invalid current plugin version: ${currentVersion}`);

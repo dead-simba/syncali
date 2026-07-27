@@ -24,13 +24,14 @@ export function createSettingsTab(
     listFileSizeBlockedFiles: vi.fn(async () => []),
     isSyncEnabled: () => true,
     setSyncEnabled: vi.fn(async () => {}),
-    getPluginUpdateStatus: () => ({
+    getCommunityPluginUpdateStatus: () => ({
       state: "up_to_date",
       currentVersion: "0.0.1",
       latestVersion: "0.0.1",
     }),
-    ensurePluginUpdateCheck: vi.fn(async () => {}),
-    retryPluginUpdateCheck: vi.fn(async () => {}),
+    ensureCommunityPluginUpdateCheck: vi.fn(async () => {}),
+    retryCommunityPluginUpdateCheck: vi.fn(async () => {}),
+    getServerCompatibilityStatus: () => ({ state: "idle" }),
     getSubscriptionStatus: () => ({ state: "idle" }),
     ensureSubscriptionStatusCheck: vi.fn(async () => {}),
     retrySubscriptionStatusCheck: vi.fn(async () => {}),

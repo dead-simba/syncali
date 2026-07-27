@@ -8,7 +8,8 @@ import type {
   SynchFileSizeBlockedFile,
   SynchFileRules,
   SynchVaultConfigSyncRules,
-  SynchPluginUpdateStatus,
+  SynchCommunityPluginUpdateStatus,
+  SynchServerCompatibilityStatus,
   SynchStorageStatus,
   SynchSubscriptionStatus,
   SynchSyncProgress,
@@ -17,9 +18,10 @@ import type {
 } from "../plugin/view-models";
 
 export interface SynchSettingsController {
-  getPluginUpdateStatus(): SynchPluginUpdateStatus;
-  ensurePluginUpdateCheck(): Promise<void>;
-  retryPluginUpdateCheck(): Promise<void>;
+  getCommunityPluginUpdateStatus(): SynchCommunityPluginUpdateStatus;
+  ensureCommunityPluginUpdateCheck(): Promise<void>;
+  retryCommunityPluginUpdateCheck(): Promise<void>;
+  getServerCompatibilityStatus(): SynchServerCompatibilityStatus;
   getSubscriptionStatus(): SynchSubscriptionStatus;
   ensureSubscriptionStatusCheck(): Promise<void>;
   retrySubscriptionStatusCheck(): Promise<void>;

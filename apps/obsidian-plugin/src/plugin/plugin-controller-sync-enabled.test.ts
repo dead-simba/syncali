@@ -7,6 +7,7 @@ import {
   setRequestUrlMock,
 } from "../test-stubs/obsidian";
 import { DEFAULT_SYNC_FILE_RULES } from "../sync/core/file-rules";
+import { DEFAULT_VAULT_CONFIG_SYNC_RULES } from "../sync/core/vault-config-rules";
 import { SyncController } from "../sync/runtime/controller";
 import { SYNCH_SETTINGS_KEY, type SynchPluginSettings } from "../settings/schema";
 import { SynchPluginController } from "./plugin-controller";
@@ -116,7 +117,7 @@ describe("SynchPluginController sync enabled setting", () => {
     await controller.setSyncEnabled(true);
     await controller.ensureAutoSyncState();
 
-    expect(controller.getPluginUpdateStatus()).toEqual({
+    expect(controller.getServerCompatibilityStatus()).toEqual({
       state: "update_required",
       currentVersion: "0.0.1",
       minVersion: "1.2.0",
@@ -166,10 +167,60 @@ describe("SynchPluginController sync enabled setting", () => {
     const message =
       "This Synch server is not compatible with this plugin version. Update the server or install a compatible Synch plugin version.";
     expect(controller.getSyncState()).toBe("update_required");
-    expect(controller.getPluginUpdateStatus()).toEqual({
-      state: "update_required",
+    expect(controller.getServerCompatibilityStatus()).toEqual({
+      state: "incompatible",
       currentVersion: "0.0.1",
       minVersion: "0.0.9",
+      apiMajor: 2,
+      message,
+    });
+
+    await controller.setSyncEnabled(true);
+    await controller.ensureAutoSyncState();
+
+    expect(ensureAutoSyncState).not.toHaveBeenCalled();
+    expect(stopAutoSyncAndMarkNotReady).toHaveBeenCalled();
+    expect(controller.isSyncEnabled()).toBe(false);
+    expect(getNotices().filter((notice) => notice.message === message)).toHaveLength(2);
+  });
+
+  it("still blocks sync for self-hosted servers when API major is incompatible", async () => {
+    const plugin = createPluginWithSettings({
+      apiBaseUrl: "https://custom.synch.test",
+      fileRules: DEFAULT_SYNC_FILE_RULES,
+      vaultConfigSync: DEFAULT_VAULT_CONFIG_SYNC_RULES,
+      syncEnabled: false,
+    });
+    setRequestUrlMock(
+      vi.fn(async () => ({
+        status: 200,
+        json: {
+          status: "ok",
+          minVersion: "0.0.9",
+          apiMajor: 2,
+        },
+      })),
+    );
+    const ensureAutoSyncState = vi
+      .spyOn(SyncController.prototype, "ensureAutoSyncState")
+      .mockResolvedValue();
+    const stopAutoSyncAndMarkNotReady = vi
+      .spyOn(SyncController.prototype, "stopAutoSyncAndMarkNotReady")
+      .mockImplementation(() => {});
+    const controller = new SynchPluginController({
+      plugin,
+      refreshUi: vi.fn(),
+    });
+    await controller.initialize();
+
+    const message =
+      "This Synch server is not compatible with this plugin version. Update the server or install a compatible Synch plugin version.";
+    expect(controller.getSyncState()).toBe("update_required");
+    expect(controller.getServerCompatibilityStatus()).toEqual({
+      state: "incompatible",
+      currentVersion: "0.0.1",
+      minVersion: "0.0.9",
+      apiMajor: 2,
       message,
     });
 

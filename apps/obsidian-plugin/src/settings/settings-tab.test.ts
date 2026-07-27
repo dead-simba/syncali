@@ -86,10 +86,10 @@ describe("SynchSettingTab", () => {
   });
 
   it("checks and shows plugin updates on the right side of the settings heading only when needed", () => {
-    const ensurePluginUpdateCheck = vi.fn(async () => {});
+    const ensureCommunityPluginUpdateCheck = vi.fn(async () => {});
     const tab = createSettingsTab({
-      ensurePluginUpdateCheck,
-      getPluginUpdateStatus: () => ({
+      ensureCommunityPluginUpdateCheck,
+      getCommunityPluginUpdateStatus: () => ({
         state: "update_available",
         currentVersion: "0.0.1",
         latestVersion: "0.0.2",
@@ -98,7 +98,7 @@ describe("SynchSettingTab", () => {
 
     tab.display();
 
-    expect(ensurePluginUpdateCheck).toHaveBeenCalledTimes(1);
+    expect(ensureCommunityPluginUpdateCheck).toHaveBeenCalledTimes(1);
     expect(getSettingNames()[0]).toBe("Synch");
     expect(getCreatedElementTexts()).toContain("Update Synch from Community plugins");
     expect(getSettingDescriptions()).not.toContain(
@@ -115,7 +115,7 @@ describe("SynchSettingTab", () => {
 
   it("shows required plugin updates as a sync blocker", () => {
     const tab = createSettingsTab({
-      getPluginUpdateStatus: () => ({
+      getServerCompatibilityStatus: () => ({
         state: "update_required",
         currentVersion: "0.0.1",
         minVersion: "1.2.0",
@@ -135,7 +135,7 @@ describe("SynchSettingTab", () => {
 
   it("hides plugin update status from settings when no update is available", () => {
     const tab = createSettingsTab({
-      getPluginUpdateStatus: () => ({
+      getCommunityPluginUpdateStatus: () => ({
         state: "checking",
         currentVersion: "0.0.1",
       }),
@@ -148,7 +148,7 @@ describe("SynchSettingTab", () => {
 
     resetObsidianMocks();
     createSettingsTab({
-      getPluginUpdateStatus: () => ({
+      getCommunityPluginUpdateStatus: () => ({
         state: "up_to_date",
         currentVersion: "0.0.1",
         latestVersion: "0.0.1",
@@ -160,7 +160,7 @@ describe("SynchSettingTab", () => {
 
     resetObsidianMocks();
     createSettingsTab({
-      getPluginUpdateStatus: () => ({
+      getCommunityPluginUpdateStatus: () => ({
         state: "failed",
         currentVersion: "0.0.1",
         error: "offline",

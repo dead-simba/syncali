@@ -48,7 +48,7 @@ export interface SynchFileSizeBlockedFile {
   maxFileSizeBytes: number | null;
 }
 
-export type SynchPluginUpdateStatus =
+export type SynchCommunityPluginUpdateStatus =
   | {
       state: "idle" | "checking";
       currentVersion: string;
@@ -64,15 +64,33 @@ export type SynchPluginUpdateStatus =
       latestVersion: string;
     }
   | {
+      state: "failed";
+      currentVersion: string;
+      error: string;
+    };
+
+export type SynchServerCompatibilityStatus =
+  | {
+      state: "idle";
+    }
+  | {
+      state: "ok";
+      currentVersion: string;
+      minVersion: string;
+      apiMajor: number;
+    }
+  | {
       state: "update_required";
       currentVersion: string;
       minVersion: string;
       message: string;
     }
   | {
-      state: "failed";
+      state: "incompatible";
       currentVersion: string;
-      error: string;
+      minVersion: string;
+      apiMajor: number;
+      message: string;
     };
 
 export type SynchSubscriptionStatus =

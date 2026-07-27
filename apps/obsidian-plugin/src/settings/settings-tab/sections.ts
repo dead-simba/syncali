@@ -1,6 +1,6 @@
 import { App, Notice, setIcon, setTooltip, Setting } from "obsidian";
 
-import { getDefaultApiBaseUrl } from "../../config";
+import { getServerDeployment } from "../../config";
 import { getSynchLocale, t } from "../../i18n";
 import type {
   SynchFileRules,
@@ -41,9 +41,13 @@ export function renderSettingsHeading(
   containerEl: HTMLElement,
   controller: SynchSettingsController,
 ): void {
-  const updateStatus = controller.getPluginUpdateStatus();
+  const serverCompatibility = controller.getServerCompatibilityStatus();
+  const communityUpdate = controller.getCommunityPluginUpdateStatus();
   const heading = new Setting(containerEl).setName("Synch").setHeading();
-  if (updateStatus.state === "update_required") {
+  if (
+    serverCompatibility.state === "update_required" ||
+    serverCompatibility.state === "incompatible"
+  ) {
     heading.settingEl.addClass("synch-plugin-update-available");
     heading.controlEl.createSpan({
       cls: "synch-plugin-update-badge",
@@ -52,7 +56,7 @@ export function renderSettingsHeading(
     return;
   }
 
-  if (updateStatus.state !== "update_available") {
+  if (communityUpdate.state !== "update_available") {
     return;
   }
 
@@ -75,7 +79,8 @@ export function renderApiBaseUrlSetting(
   },
 ): void {
   const apiBaseUrl = controller.getApiBaseUrl();
-  const visibleApiBaseUrl = apiBaseUrl === getDefaultApiBaseUrl() ? "" : apiBaseUrl;
+  const visibleApiBaseUrl =
+    getServerDeployment(apiBaseUrl) === "official_cloud" ? "" : apiBaseUrl;
   let apiBaseUrlInput = visibleApiBaseUrl;
   const serverDescription = options.isDeviceLoginInProgress
     ? t("server.descFinishSignIn")
@@ -132,7 +137,7 @@ export function renderApiBaseUrlSetting(
             await controller.updateApiBaseUrl(apiBaseUrlInput);
             new Notice(t("server.saved"));
             options.onShowSelfHostedServerUrlChange(
-              controller.getApiBaseUrl() !== getDefaultApiBaseUrl(),
+              getServerDeployment(controller.getApiBaseUrl()) === "self_hosted",
             );
           } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
@@ -148,11 +153,14 @@ export function renderSyncStatusSetting(
   hasConnectedRemoteVault: boolean,
   refresh: RefreshSettings,
 ): SyncStatusSettingControls | null {
-  const updateStatus = controller.getPluginUpdateStatus();
-  if (updateStatus.state === "update_required") {
+  const serverCompatibility = controller.getServerCompatibilityStatus();
+  if (
+    serverCompatibility.state === "update_required" ||
+    serverCompatibility.state === "incompatible"
+  ) {
     new Setting(containerEl)
       .setName(t("sync.paused"))
-      .setDesc(updateStatus.message);
+      .setDesc(serverCompatibility.message);
     return null;
   }
 
