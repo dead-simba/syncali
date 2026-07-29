@@ -1,10 +1,10 @@
 ---
 title: Terms of Service
 description: Terms that apply to the hosted Synch service.
-updatedDate: 2026-05-08
+updatedDate: 2026-07-29
 ---
 
-Last updated: May 8, 2026
+Last updated: July 29, 2026
 
 These Terms of Service ("Terms") govern your access to and use of the hosted Synch service, including the Synch website, API, and hosted sync infrastructure (the "Service"). The Service is operated by Synch ("Synch", "we", "us", or "our").
 
@@ -62,7 +62,7 @@ Because Synch cannot inspect plaintext encrypted vault contents, you remain full
 
 ## 7. Plans, Quotas, And Billing
 
-Synch may offer free, beta, trial, paid, or limited plans. Plans may include limits on synced vaults, storage, maximum file size, version history, traffic, devices, or other usage.
+Synch may offer free, trial, paid, or limited plans. Plans may include limits on synced vaults, storage, maximum file size, version history, traffic, devices, or other usage.
 
 Paid plans are available for the hosted Service. Billing is handled by Polar, and subscription management may be available through a Polar customer portal linked from Synch. Payment information, taxes, renewals, cancellations, refunds, and subscription terms may be subject to additional checkout or billing portal terms shown at the time of purchase or management.
 
@@ -84,7 +84,7 @@ We may suspend or terminate access to the Service if we reasonably believe you v
 
 ## 10. Service Changes
 
-Synch is in beta and may change rapidly. We may add, remove, or modify features, limits, APIs, storage formats, client requirements, pricing, plan availability, billing providers, and hosted infrastructure. We may discontinue the Service or any part of it.
+Synch may evolve as the Service develops. We may add, remove, or modify features, limits, APIs, storage formats, client requirements, pricing, plan availability, billing providers, and hosted infrastructure. We may discontinue the Service or any part of it.
 
 Where practical, we will provide notice of material changes that affect your ability to access synced data, but you are responsible for keeping your own backups and exportable copies.
 

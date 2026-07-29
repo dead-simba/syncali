@@ -1,7 +1,6 @@
 # Synch
 
 Synch is an Obsidian Sync alternative for end-to-end encrypted vault synchronization.
-It is currently in beta.
 
 Synch is an independent community plugin and service. It is not affiliated with
 Obsidian.
@@ -104,10 +103,9 @@ vault.
 
 ### Payments
 
-Synch is currently in beta. The hosted service offers free and paid subscription
-plans. The current paid hosted plan is Sync Starter, available with monthly or
-annual billing. Payment processing and subscription management are handled by
-Polar.
+The hosted service offers free and paid subscription plans. The current paid
+hosted plan is Sync Starter, available with monthly or annual billing. Payment
+processing and subscription management are handled by Polar.
 
 ### Telemetry, ads, and privacy
 
