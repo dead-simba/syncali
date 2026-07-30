@@ -19,7 +19,7 @@ directory listing issue. Install it with BRAT in the meantime:
 
 1. Open Obsidian Settings and go to **Community plugins**.
 2. Turn off Restricted mode, select **Browse**, then install and enable **BRAT**.
-3. Open the command palette and run **BRAT: Add a beta plugin for testing**.
+3. Open BRAT's plugin settings and select **Add beta plugin** under **Beta plugin list**.
 4. Enter the repository URL `https://github.com/hjinco/synch` and confirm.
 5. After installation finishes, return to **Community plugins** and enable **Synch**.
 

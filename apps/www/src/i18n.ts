@@ -132,7 +132,7 @@ export const ui = {
 			installSteps: [
 				["Open Obsidian Settings and go to", "Community plugins", "."],
 				["Turn off Restricted mode, select Browse, then install and enable", "BRAT", "."],
-				["Open the command palette and run", "BRAT: Add a beta plugin for testing", "."],
+				["Open BRAT's plugin settings and select", "Add beta plugin", " under Beta plugin list."],
 				["Enter the repository URL", "https://github.com/hjinco/synch", " and confirm."],
 				["After installation finishes, return to Community plugins and enable", "Synch", "."],
 			],
@@ -284,7 +284,7 @@ export const ui = {
 			installSteps: [
 				["Obsidian 설정을 열고", "Community plugins", "로 이동합니다."],
 				["제한 모드를 끄고 Browse를 선택한 뒤", "BRAT", "을 설치하고 활성화합니다."],
-				["명령 팔레트를 열고", "BRAT: Add a beta plugin for testing", "을 실행합니다."],
+				["BRAT 플러그인 설정을 열고 Beta plugin list에서", "Add beta plugin", "을 선택합니다."],
 				["다음 저장소 URL을 입력하고 확인합니다:", "https://github.com/hjinco/synch", "."],
 				["설치가 끝나면 Community plugins로 돌아가", "Synch", "를 활성화합니다."],
 			],
@@ -436,7 +436,7 @@ export const ui = {
 			installSteps: [
 				["Obsidian設定を開き", "Community plugins", "へ移動します。"],
 				["制限モードをオフにしてBrowseを選択し、", "BRAT", "をインストールして有効化します。"],
-				["コマンドパレットを開き、", "BRAT: Add a beta plugin for testing", "を実行します。"],
+				["BRATのプラグイン設定を開き、Beta plugin listで", "Add beta plugin", "を選択します。"],
 				["リポジトリのURL", "https://github.com/hjinco/synch", "を入力して確定します。"],
 				["インストール完了後、Community pluginsに戻り、", "Synch", "を有効化します。"],
 			],
@@ -588,7 +588,7 @@ export const ui = {
 			installSteps: [
 				["打开 Obsidian 设置并进入", "Community plugins", "。"],
 				["关闭受限模式，选择Browse，然后安装并启用", "BRAT", "。"],
-				["打开命令面板并运行", "BRAT: Add a beta plugin for testing", "。"],
+				["打开BRAT插件设置，在Beta plugin list中选择", "Add beta plugin", "。"],
 				["输入仓库URL", "https://github.com/hjinco/synch", "并确认。"],
 				["安装完成后返回Community plugins并启用", "Synch", "。"],
 			],
@@ -740,7 +740,7 @@ export const ui = {
 			installSteps: [
 				["開啟 Obsidian 設定並前往", "Community plugins", "。"],
 				["關閉受限模式，選擇Browse，然後安裝並啟用", "BRAT", "。"],
-				["開啟命令面板並執行", "BRAT: Add a beta plugin for testing", "。"],
+				["開啟BRAT外掛設定，在Beta plugin list中選擇", "Add beta plugin", "。"],
 				["輸入儲存庫URL", "https://github.com/hjinco/synch", "並確認。"],
 				["安裝完成後返回Community plugins並啟用", "Synch", "。"],
 			],

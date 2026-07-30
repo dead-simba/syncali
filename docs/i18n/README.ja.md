@@ -18,7 +18,7 @@ Synch は独立したコミュニティプラグインおよびサービスで�
 
 1. Obsidian の設定を開き、**Community plugins** に移動します。
 2. 制限モードをオフにして **Browse** を選択し、**BRAT** をインストールして有効化します。
-3. コマンドパレットを開き、**BRAT: Add a beta plugin for testing** を実行します。
+3. BRAT のプラグイン設定を開き、**Beta plugin list** で **Add beta plugin** を選択します。
 4. リポジトリの URL `https://github.com/hjinco/synch` を入力して確定します。
 5. インストール完了後、**Community plugins** に戻り、**Synch** を有効化します。
 

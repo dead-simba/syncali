@@ -16,7 +16,7 @@ BRAT 安裝：
 
 1. 開啟 Obsidian 設定並前往 **Community plugins**。
 2. 關閉受限模式，選擇 **Browse**，然後安裝並啟用 **BRAT**。
-3. 開啟命令面板並執行 **BRAT: Add a beta plugin for testing**。
+3. 開啟 BRAT 外掛設定，在 **Beta plugin list** 中選擇 **Add beta plugin**。
 4. 輸入儲存庫 URL `https://github.com/hjinco/synch` 並確認。
 5. 安裝完成後返回 **Community plugins** 並啟用 **Synch**。
 
