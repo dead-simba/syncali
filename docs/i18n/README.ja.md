@@ -11,13 +11,16 @@ Synch は独立したコミュニティプラグインおよびサービスで�
 翻訳: [English](../../README.md) · [한국어](README.ko.md) ·
 [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md)
 
-## Community plugins からインストール
+## BRAT でインストール
+
+現在、ディレクトリ登録の問題により、Community Plugins から Synch を
+インストールできません。当面の間は BRAT を使用してインストールしてください：
 
 1. Obsidian の設定を開き、**Community plugins** に移動します。
-2. 制限モードをオフにし、**Browse** を選択します。
-3. `Synch by hjinco` を検索して選択します。
-4. **Install** を選択します。
-5. インストールが完了したら **Enable** を選択します。
+2. 制限モードをオフにして **Browse** を選択し、**BRAT** をインストールして有効化します。
+3. コマンドパレットを開き、**BRAT: Add a beta plugin for testing** を実行します。
+4. リポジトリのパス `hjinco/synch` を入力して確定します。
+5. インストール完了後、**Community plugins** に戻り、**Synch** を有効化します。
 
 ## Synch の使い方
 

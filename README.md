@@ -12,13 +12,16 @@ Translations: [한국어](docs/i18n/README.ko.md) ·
 [简体中文](docs/i18n/README.zh-CN.md) ·
 [繁體中文](docs/i18n/README.zh-TW.md)
 
-## Install from Community Plugins
+## Install with BRAT
+
+Synch is temporarily unavailable in the Community Plugins directory due to a
+directory listing issue. Install it with BRAT in the meantime:
 
 1. Open Obsidian Settings and go to **Community plugins**.
-2. Turn off Restricted mode, then select **Browse**.
-3. Search for `Synch by hjinco` and select it.
-4. Select **Install**.
-5. Select **Enable** after installation finishes.
+2. Turn off Restricted mode, select **Browse**, then install and enable **BRAT**.
+3. Open the command palette and run **BRAT: Add a beta plugin for testing**.
+4. Enter the repository path `hjinco/synch` and confirm.
+5. After installation finishes, return to **Community plugins** and enable **Synch**.
 
 ## How to use Synch
 
