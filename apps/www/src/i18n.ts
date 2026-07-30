@@ -133,7 +133,7 @@ export const ui = {
 				["Open Obsidian Settings and go to", "Community plugins", "."],
 				["Turn off Restricted mode, select Browse, then install and enable", "BRAT", "."],
 				["Open the command palette and run", "BRAT: Add a beta plugin for testing", "."],
-				["Enter the repository path", "hjinco/synch", " and confirm."],
+				["Enter the repository URL", "https://github.com/hjinco/synch", " and confirm."],
 				["After installation finishes, return to Community plugins and enable", "Synch", "."],
 			],
 			selfHosting: {
@@ -285,7 +285,7 @@ export const ui = {
 				["Obsidian 설정을 열고", "Community plugins", "로 이동합니다."],
 				["제한 모드를 끄고 Browse를 선택한 뒤", "BRAT", "을 설치하고 활성화합니다."],
 				["명령 팔레트를 열고", "BRAT: Add a beta plugin for testing", "을 실행합니다."],
-				["저장소 경로", "hjinco/synch", "를 입력하고 확인합니다."],
+				["다음 저장소 URL을 입력하고 확인합니다:", "https://github.com/hjinco/synch", "."],
 				["설치가 끝나면 Community plugins로 돌아가", "Synch", "를 활성화합니다."],
 			],
 			selfHosting: {
@@ -437,7 +437,7 @@ export const ui = {
 				["Obsidian設定を開き", "Community plugins", "へ移動します。"],
 				["制限モードをオフにしてBrowseを選択し、", "BRAT", "をインストールして有効化します。"],
 				["コマンドパレットを開き、", "BRAT: Add a beta plugin for testing", "を実行します。"],
-				["リポジトリのパス", "hjinco/synch", "を入力して確定します。"],
+				["リポジトリのURL", "https://github.com/hjinco/synch", "を入力して確定します。"],
 				["インストール完了後、Community pluginsに戻り、", "Synch", "を有効化します。"],
 			],
 			selfHosting: {
@@ -589,7 +589,7 @@ export const ui = {
 				["打开 Obsidian 设置并进入", "Community plugins", "。"],
 				["关闭受限模式，选择Browse，然后安装并启用", "BRAT", "。"],
 				["打开命令面板并运行", "BRAT: Add a beta plugin for testing", "。"],
-				["输入仓库路径", "hjinco/synch", "并确认。"],
+				["输入仓库URL", "https://github.com/hjinco/synch", "并确认。"],
 				["安装完成后返回Community plugins并启用", "Synch", "。"],
 			],
 			selfHosting: {
@@ -741,7 +741,7 @@ export const ui = {
 				["開啟 Obsidian 設定並前往", "Community plugins", "。"],
 				["關閉受限模式，選擇Browse，然後安裝並啟用", "BRAT", "。"],
 				["開啟命令面板並執行", "BRAT: Add a beta plugin for testing", "。"],
-				["輸入儲存庫路徑", "hjinco/synch", "並確認。"],
+				["輸入儲存庫URL", "https://github.com/hjinco/synch", "並確認。"],
 				["安裝完成後返回Community plugins並啟用", "Synch", "。"],
 			],
 			selfHosting: {
