@@ -4,15 +4,27 @@ import { z } from "zod";
 import type { SyncTokenService } from "../access/token-service";
 import type { CoordinatorProxyRepository } from "../coordinator/proxy-repository";
 import { blobObjectKey } from "./object-key";
-import type { BlobRepository } from "./repository";
-import { BLOB_SIZE_HEADER, parseBlobSizeHeader } from "./size";
+import type { BlobStorage } from "./storage";
+import { BLOB_SIZE_HEADER, limitBodySize, parseBlobSizeHeader } from "./size";
 import { Hono } from "hono";
+
+// Both IDs are server/client-generated UUIDs in normal operation, but the
+// route param itself accepts any string (Hono decodes %2F into a literal
+// "/" in path params) - without this, a blobId like "../other-vault/blob"
+// reaches the storage backend's key construction, and on the S3-compatible
+// backend a ".." segment survives encodeURIComponent and gets collapsed by
+// the WHATWG URL parser, letting one vault's token read/write another
+// vault's blobs. Pinning the charset here stops it before it ever reaches
+// a storage backend, for every backend, not just the one that happened to
+// already guard against it.
+const SAFE_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
+const safeIdSchema = z.string().trim().min(1).regex(SAFE_ID_PATTERN);
 
 export function registerBlobRoutes(
 	app: Hono,
 	deps: {
 		syncTokenService: SyncTokenService;
-		blobRepository: BlobRepository;
+		blobRepository: BlobStorage;
 		coordinatorProxyRepository: CoordinatorProxyRepository;
 	},
 ): void {
@@ -21,8 +33,8 @@ export function registerBlobRoutes(
 		zValidator(
 			"param",
 			z.object({
-				vaultId: z.string().trim().min(1),
-				blobId: z.string().trim().min(1),
+				vaultId: safeIdSchema,
+				blobId: safeIdSchema,
 			}),
 		),
 		async (c) => {
@@ -60,31 +72,48 @@ export function registerBlobRoutes(
 			}
 
 			const objectKey = blobObjectKey(vaultId, blobId);
+			const { readable, sizeMismatch } = limitBodySize(request.body, declaredSize);
+
+			let uploaded: { size: number } | null = null;
+			let uploadError: unknown;
 			try {
-				const uploaded = await deps.blobRepository.upload(objectKey, request.body);
-				if (uploaded.size !== declaredSize) {
-					await deps.blobRepository.delete(objectKey);
-					await deps.coordinatorProxyRepository.abortStagedBlob(
-						vaultId,
-						blobId,
-						request.headers.get("authorization"),
-					);
-					return c.json(
-						{
-							error: "size_mismatch",
-							message: `declared blob size ${declaredSize} did not match uploaded size ${uploaded.size}`,
-						},
-						400,
-					);
-				}
+				uploaded = await deps.blobRepository.upload(objectKey, readable);
 			} catch (error) {
+				uploadError = error;
+			}
+
+			// Checked after the upload settles either way: `limitBodySize` stops
+			// reading (and aborts the stream) the moment the body exceeds
+			// `declaredSize`, well before it could ever reach a backend that
+			// buffers uploads in memory - so this is the authoritative signal for
+			// "declared size didn't match", not `uploaded.size` (which a backend
+			// may never even report if its own consumption of `readable` also
+			// rejected once aborted).
+			if ((await sizeMismatch) || (uploaded && uploaded.size !== declaredSize)) {
+				await deps.blobRepository.delete(objectKey).catch(() => {});
 				await deps.coordinatorProxyRepository.abortStagedBlob(
 					vaultId,
 					blobId,
 					request.headers.get("authorization"),
 				);
-				throw error;
+				return c.json(
+					{
+						error: "size_mismatch",
+						message: `declared blob size ${declaredSize} did not match the uploaded body`,
+					},
+					400,
+				);
 			}
+
+			if (uploadError) {
+				await deps.coordinatorProxyRepository.abortStagedBlob(
+					vaultId,
+					blobId,
+					request.headers.get("authorization"),
+				);
+				throw uploadError;
+			}
+
 			return c.json(
 				{
 					ok: true,
@@ -100,8 +129,8 @@ export function registerBlobRoutes(
 		zValidator(
 			"param",
 			z.object({
-				vaultId: z.string().trim().min(1),
-				blobId: z.string().trim().min(1),
+				vaultId: safeIdSchema,
+				blobId: safeIdSchema,
 			}),
 		),
 		async (c) => {

@@ -4,7 +4,7 @@ import type { BetterAuthPlugin } from "better-auth";
 import { bearer, deviceAuthorization, organization } from "better-auth/plugins";
 import { eq } from "drizzle-orm";
 
-import { createDb } from "../db/client";
+import type { AppDb } from "../db/client";
 import * as schema from "../db/d1";
 import { getDeviceVerificationUri } from "./device";
 import { createEmailVerificationConfig } from "./email";
@@ -18,6 +18,8 @@ export type AuthConfig = {
 	trustedOrigins: string[];
 	selfHosted: boolean;
 	devMode: boolean;
+	/** Signing secret for sessions/cookies/CSRF. Falls back to better-auth's own `BETTER_AUTH_SECRET` env lookup when omitted (the Cloudflare path). */
+	secret?: string;
 	email?: SendEmail;
 	emailFrom?: string;
 	plugins?: BetterAuthPlugin[];
@@ -26,11 +28,11 @@ export type AuthConfig = {
 /** Auth session lifetime for signed-in clients (plugin bearer token, cookies). */
 const SESSION_EXPIRES_IN_SECONDS = 60 * 60 * 24 * 30;
 
-export function createAuth(database: D1Database, config: AuthConfig) {
-	const db = createDb(database);
+export function createAuth(db: AppDb, config: AuthConfig) {
 	const emailVerification = createEmailVerificationConfig(config);
 	const auth = betterAuth({
 		baseURL: config.baseURL,
+		secret: config.secret,
 		database: drizzleAdapter(db, {
 			provider: "sqlite",
 			schema,
