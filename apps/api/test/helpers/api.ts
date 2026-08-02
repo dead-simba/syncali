@@ -142,10 +142,15 @@ export async function signUpAccount(
 	const email = overrides.email ?? `${uniqueId("sync-e2e")}@test.invalid`;
 	const password = overrides.password ?? DEFAULT_PASSWORD;
 	const name = overrides.name ?? "Synch Vitest";
+	const selfHostedTestEnv = {
+		...env,
+		SELF_HOSTED: true,
+		AUTH_ALLOWED_EMAILS: email,
+	};
 
 	const signUp = await jsonRequestWithEnv(
 		"/api/auth/sign-up/email",
-		{ ...env, SELF_HOSTED: true },
+		selfHostedTestEnv,
 		{
 			method: "POST",
 			headers: {
@@ -163,7 +168,7 @@ export async function signUpAccount(
 
 	const session = await jsonRequestWithEnv<{ user: { id: string } }>(
 		"/api/auth/get-session",
-		{ ...env, SELF_HOSTED: true },
+		selfHostedTestEnv,
 		{
 			headers: {
 				cookie: sessionCookie,

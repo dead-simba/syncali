@@ -192,6 +192,7 @@ describe("vault integration", () => {
 		const selfHostedEnv = {
 			...env,
 			SELF_HOSTED: true,
+			AUTH_ALLOWED_EMAILS: primary.email,
 			VAULT_PURGE_QUEUE: undefined,
 			POLICY_REFRESH_QUEUE: undefined,
 		} as unknown as Env;
@@ -279,7 +280,7 @@ describe("vault integration", () => {
 		const primary = await signUpAndCreateVault("Shared Name");
 		const duplicate = await jsonRequestWithEnv<{ vault: { id: string; name: string } }>(
 			"/v1/vaults",
-			{ ...env, SELF_HOSTED: true },
+			{ ...env, SELF_HOSTED: true, AUTH_ALLOWED_EMAILS: primary.email },
 			{
 				method: "POST",
 				headers: {
@@ -459,7 +460,7 @@ describe("vault integration", () => {
 		const primary = await signUpAndCreateVault("Self Hosted Personal");
 		const duplicate = await jsonRequestWithEnv<{ vault: { id: string; name: string } }>(
 			"/v1/vaults",
-			{ ...env, SELF_HOSTED: true },
+			{ ...env, SELF_HOSTED: true, AUTH_ALLOWED_EMAILS: primary.email },
 			{
 				method: "POST",
 				headers: {
