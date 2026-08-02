@@ -52,11 +52,13 @@ Synch は既定で Markdown ファイルを同期します。画像、音声、�
 
 ## セルフホスティング
 
-無料の Cloudflare アカウントで自分の Synch サーバーを実行し、カスタムサーバー URL
-で Obsidian プラグインに接続できます。
+無料の Cloudflare アカウント、または Docker/systemd を実行できる自分のハードウェアで
+Synch サーバーを運用し、カスタムサーバー URL で Obsidian プラグインに接続できます。
 
 セルフホスティングガイドを参照してください:
-[https://synch.run/self-hosting](https://synch.run/self-hosting)
+
+- [Cloudflare](https://synch.run/self-hosting)
+- [Docker/systemd（Cloudflare 不要）](https://synch.run/self-hosting-docker)
 
 ## 開示事項
 

@@ -1,0 +1,127 @@
+---
+title: Cloudflare を使わずに Synch をセルフホスト
+description: Docker Compose または systemd で自分のハードウェア上に Synch サーバーを実行できます。Cloudflare やサードパーティサービスは必要ありません。
+updatedDate: 2026-08-01
+---
+
+Cloudflare をまったく使いたくない場合、Synch のサーバーは通常の Node.js プロセスとしても実行できます。このガイドでは、ホームラボの NAS、小規模な VPS、Incus/LXC コンテナなど、長時間稼働するプロセスを実行してポートを公開できる自分のハードウェア上で、[Docker Compose](#docker-compose-で-デプロイ) または [systemd](#docker-なしで-systemd-を実行) を使って Synch を実行する方法を説明します。
+
+データはすべてディスクに保存されます。vault ごとに SQLite ファイルが 1 つ作成され、アカウントと vault のメタデータ用に小さなアプリデータベースが追加されます。D1、Durable Objects、R2 は必要ありません。自分で管理するディレクトリにファイルを保存するだけです。
+
+無料の Cloudflare アカウントにデプロイしたい場合は、[Cloudflare セルフホスティングガイド](/ja/self-hosting/)を参照してください。
+
+## デプロイ前の準備
+
+どちらの方法でも、Obsidian を使うデバイスからサーバーに接続できる必要があります。ローカルネットワーク内だけで使うことも、外出先から同期できるようインターネット経由で使うこともできます。後者の場合は reverse proxy の背後に TLS を設定してください。サーバー自体は通常の HTTP のみを使用します。
+
+## Docker Compose でデプロイ
+
+Docker と Docker Compose をインストールしておく必要があります。
+
+1. リポジトリを clone して API ディレクトリに移動します。
+
+   ```bash
+   git clone https://github.com/hjinco/synch.git
+   cd synch/apps/api
+   ```
+
+2. サンプル環境ファイルをコピーします。
+
+   ```bash
+   cp .env.example .env
+   ```
+
+3. `.env` を編集して、次の値を設定します。
+   - `PUBLIC_URL` - クライアントがこのサーバーに接続するためのアドレスです。LAN では `http://192.168.1.50:8787`、reverse proxy の背後では `https://synch.your-domain.example` などを使えます。スキームとポートを含めて正確に一致させてください。受信リクエストの origin の検証に使われます。
+   - `BETTER_AUTH_SECRET` と `SYNC_TOKEN_SECRET` - 互いに独立した 2 つのランダムな secret です。それぞれ次のコマンドで生成します。
+
+     ```bash
+     openssl rand -hex 32
+     ```
+
+4. サーバーを起動します。
+
+   ```bash
+   docker compose up -d
+   ```
+
+vault と blob のデータは、再起動やアップグレード後も `synch-data` Docker ボリュームに保持されます。新しいホストへ移行する場合は、このボリュームと `.env` ファイルを一緒にコピーしてください。
+
+### Blob ストレージ
+
+デフォルトでは、暗号化されたファイルの内容は同じデータボリューム内のディスクに保存されます。AWS S3、MinIO、R2 などの S3 互換バケットを使う場合は、起動前に `.env` の `BLOB_STORAGE=s3` ブロックのコメントを外して値を入力してください。
+
+### アップグレード
+
+```bash
+git pull
+docker compose up -d --build
+```
+
+データベースのマイグレーションは起動時に自動で実行されます。
+
+## Docker なしで systemd を実行
+
+サーバーは単純な Node.js プロセス（`src/self-host.ts`）で、[tsx](https://tsx.is/) を使って実行します。Docker は便利な選択肢ですが必須ではありません。すでに VM（Incus/LXC コンテナなど）を使っていて、Docker を依存関係として追加したくない場合に適した方法です。
+
+Debian/Ubuntu では、[`install.sh`](https://github.com/hjinco/synch/blob/main/apps/api/install.sh) が以下の手順を自動化します。リポジトリを clone して `cd apps/api && sudo ./install.sh` を実行してください。`git pull` 後の更新や再起動のために再実行しても安全です。手動で設定する場合は次の手順に従います。
+
+1. Node.js 24 とビルドツールチェーンをインストールします。使用している VM のアーキテクチャや libc に合う prebuilt バイナリがない場合、`better-sqlite3` のネイティブモジュールをビルドするために必要です。
+
+   ```bash
+   # Debian/Ubuntu
+   sudo apt install -y nodejs python3 make g++
+   sudo corepack enable
+   ```
+
+2. リポジトリを clone して production 依存関係をインストールします。
+
+   ```bash
+   git clone https://github.com/hjinco/synch.git /opt/synch
+   cd /opt/synch/apps/api
+   pnpm install --frozen-lockfile --filter @synch/api... --prod
+   ```
+
+3. `.env.example` を `.env` にコピーし、上記の Docker Compose の手順と同じ値を設定します。
+
+4. [systemd unit の例](https://github.com/hjinco/synch/blob/main/apps/api/synch-api.service.example)をインストールして起動します。
+
+   ```bash
+   sudo useradd --system --home /var/lib/synch-api --create-home synch
+   sudo cp synch-api.service.example /etc/systemd/system/synch-api.service
+   # /opt/synch や synch ユーザーを使わない場合は unit のパス/User/Group を編集してください。
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now synch-api
+   ```
+
+5. 起動していることを確認します。
+
+   ```bash
+   curl http://localhost:8787/health
+   sudo journalctl -u synch-api -f
+   ```
+
+### アップグレード（systemd）
+
+```bash
+cd /opt/synch
+git pull
+cd apps/api
+pnpm install --frozen-lockfile --filter @synch/api... --prod
+sudo systemctl restart synch-api
+```
+
+### localhost のみにバインド
+
+デフォルトでは、サーバーは `0.0.0.0`（すべてのインターフェース）で待ち受けます。Docker Compose がポート公開を行うにはこの設定が必要です。systemd でのデプロイをローカルの reverse proxy（例: [`tailscale serve`](https://tailscale.com/kb/1242/tailscale-serve)、nginx、Caddy）の背後で実行し、サーバーに LAN や公開インターフェースから直接アクセスされたくない場合は、`.env` に `HOST=127.0.0.1` を設定してください。systemd unit の例と `install.sh` では、すでにこの設定が使われています。
+
+変更後は、`PUBLIC_URL` をクライアントが実際に接続するアドレス（`127.0.0.1` ではなく reverse proxy のアドレス）に更新して、サービスを再起動してください。`PUBLIC_URL` は better-auth が受信リクエストの origin を検証するために使います。
+
+## Obsidian を接続
+
+1. Obsidian を開きます。
+2. **Settings** に移動します。
+3. **Synch** 設定を開きます。
+4. **Self-hosted server** にサーバーの `PUBLIC_URL` を貼り付けます。末尾に `/` は付けないでください。
+5. **Save** をクリックします。
+6. 通常どおりサインインと vault の設定を続けます。

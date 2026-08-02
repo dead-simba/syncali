@@ -137,8 +137,20 @@ export const ui = {
 			],
 			selfHosting: {
 				title: "Use your own Synch server",
-				body: "Create a Synch server on a free Cloudflare account and paste its address into the Obsidian plugin. The guide walks through the setup step by step.",
-				link: "Read the self-hosting guide",
+				options: [
+					{
+						title: "Cloudflare",
+						body: "Deploy Synch to a free Cloudflare account and connect the plugin with your server URL.",
+						link: "Read the Cloudflare guide",
+						href: "/self-hosting",
+					},
+					{
+						title: "Docker / systemd",
+						body: "Run Synch on your own hardware with Docker Compose or systemd, with no Cloudflare account required.",
+						link: "Read the Docker / systemd guide",
+						href: "/self-hosting-docker",
+					},
+				],
 			},
 		},
 		pricing: {
@@ -288,8 +300,20 @@ export const ui = {
 			],
 			selfHosting: {
 				title: "내 Synch 서버 사용하기",
-				body: "Cloudflare 무료 계정에 Synch 서버를 만들고 그 주소를 Obsidian 플러그인에 넣어 사용할 수 있습니다. 가이드에서 설정 과정을 차근차근 안내합니다.",
-				link: "셀프 호스팅 가이드 보기",
+				options: [
+					{
+						title: "Cloudflare에 배포하기",
+						body: "무료 Cloudflare 계정에 Synch를 배포하고 서버 URL을 플러그인에 입력합니다.",
+						link: "Cloudflare 가이드 보기",
+						href: "/self-hosting",
+					},
+					{
+						title: "Docker / systemd",
+						body: "Cloudflare 계정 없이 Docker Compose 또는 systemd로 자신의 하드웨어에서 Synch를 실행합니다.",
+						link: "Docker / systemd 가이드 보기",
+						href: "/self-hosting-docker",
+					},
+				],
 			},
 		},
 		pricing: {
@@ -439,8 +463,20 @@ export const ui = {
 			],
 			selfHosting: {
 				title: "自分の Synch サーバーを使う",
-				body: "Cloudflare の無料アカウントに Synch サーバーを作成し、そのアドレスを Obsidian プラグインに入力できます。",
-				link: "セルフホストガイドを読む",
+				options: [
+					{
+						title: "Cloudflare にデプロイ",
+						body: "無料の Cloudflare アカウントに Synch をデプロイし、サーバー URL をプラグインに入力します。",
+						link: "Cloudflare ガイドを読む",
+						href: "/self-hosting",
+					},
+					{
+						title: "Docker / systemd",
+						body: "Cloudflare アカウントを使わず、Docker Compose または systemd で自分のハードウェア上に Synch を実行します。",
+						link: "Docker / systemd ガイドを読む",
+						href: "/self-hosting-docker",
+					},
+				],
 			},
 		},
 		pricing: {
@@ -590,8 +626,20 @@ export const ui = {
 			],
 			selfHosting: {
 				title: "使用自己的 Synch 服务器",
-				body: "你可以在 Cloudflare 免费账号中创建 Synch 服务器，并把它的地址填入 Obsidian 插件。",
-				link: "阅读自托管指南",
+				options: [
+					{
+						title: "部署到 Cloudflare",
+						body: "在免费的 Cloudflare 账号中部署 Synch，并把服务器地址填入插件。",
+						link: "阅读 Cloudflare 指南",
+						href: "/self-hosting",
+					},
+					{
+						title: "Docker / systemd",
+						body: "无需 Cloudflare 账号，使用 Docker Compose 或 systemd 在自己的硬件上运行 Synch。",
+						link: "阅读 Docker / systemd 指南",
+						href: "/self-hosting-docker",
+					},
+				],
 			},
 		},
 		pricing: {
@@ -741,8 +789,20 @@ export const ui = {
 			],
 			selfHosting: {
 				title: "使用自己的 Synch 伺服器",
-				body: "你可以在 Cloudflare 免費帳號中建立 Synch 伺服器，並把它的位址填入 Obsidian 外掛。",
-				link: "閱讀自行託管指南",
+				options: [
+					{
+						title: "部署到 Cloudflare",
+						body: "在免費的 Cloudflare 帳號中部署 Synch，並把伺服器位址填入外掛。",
+						link: "閱讀 Cloudflare 指南",
+						href: "/self-hosting",
+					},
+					{
+						title: "Docker / systemd",
+						body: "不需要 Cloudflare 帳號，使用 Docker Compose 或 systemd 在自己的硬體上執行 Synch。",
+						link: "閱讀 Docker / systemd 指南",
+						href: "/self-hosting-docker",
+					},
+				],
 			},
 		},
 		pricing: {

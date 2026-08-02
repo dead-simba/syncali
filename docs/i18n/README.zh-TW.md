@@ -45,11 +45,13 @@ Synch 預設會同步 Markdown 檔案。圖片、音訊、影片和 PDF 也預�
 
 ## 自託管
 
-你可以在免費的 Cloudflare 帳戶上執行自己的 Synch 伺服器，並透過自訂伺服器 URL
-連接 Obsidian 外掛。
+你可以在免費的 Cloudflare 帳戶上，或在能夠執行 Docker/systemd 的自有硬體上執行
+自己的 Synch 伺服器，並透過自訂伺服器 URL 連接 Obsidian 外掛。
 
 請參閱自託管指南：
-[https://synch.run/self-hosting](https://synch.run/self-hosting)
+
+- [Cloudflare](https://synch.run/self-hosting)
+- [Docker/systemd（不需要 Cloudflare）](https://synch.run/self-hosting-docker)
 
 ## 揭露事項
 

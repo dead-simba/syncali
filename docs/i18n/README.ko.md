@@ -51,11 +51,14 @@ PDF도 기본적으로 활성화되어 있습니다. 다른 파일 형식은 기
 
 ## 자체 호스팅
 
-무료 Cloudflare 계정에서 직접 Synch 서버를 실행하고, 사용자 지정 서버 URL로
-Obsidian 플러그인을 연결할 수 있습니다.
+무료 Cloudflare 계정이나 Docker/systemd를 사용할 수 있는 자체 하드웨어에서
+Synch 서버를 실행하고, 사용자 지정 서버 URL로 Obsidian 플러그인을 연결할 수
+있습니다.
 
 자체 호스팅 가이드를 참고하세요:
-[https://synch.run/self-hosting](https://synch.run/self-hosting)
+
+- [Cloudflare](https://synch.run/self-hosting)
+- [Docker/systemd (Cloudflare 불필요)](https://synch.run/self-hosting-docker)
 
 ## 고지 사항
 

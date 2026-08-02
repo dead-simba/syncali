@@ -53,11 +53,14 @@ self-hosted deployment.
 
 ## Self-hosting
 
-You can run your own Synch server on a free Cloudflare account and connect the
-Obsidian plugin to it with a custom server URL.
+You can run your own Synch server on a free Cloudflare account or on your own
+hardware with Docker/systemd, then connect the Obsidian plugin to it with a
+custom server URL.
 
-See the self-hosting guide:
-[https://synch.run/self-hosting](https://synch.run/self-hosting)
+See the self-hosting guides:
+
+- [Cloudflare](https://synch.run/self-hosting)
+- [Docker/systemd (no Cloudflare)](https://synch.run/self-hosting-docker)
 
 ## Disclosures
 

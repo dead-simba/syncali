@@ -45,11 +45,13 @@ Synch 默认同步 Markdown 文件。图片、音频、视频和 PDF 也默认�
 
 ## 自托管
 
-你可以在免费的 Cloudflare 账户上运行自己的 Synch 服务器，并通过自定义服务器 URL
-连接 Obsidian 插件。
+你可以在免费的 Cloudflare 账户上，或在能够运行 Docker/systemd 的自有硬件上运行
+自己的 Synch 服务器，并通过自定义服务器 URL 连接 Obsidian 插件。
 
 请参阅自托管指南：
-[https://synch.run/self-hosting](https://synch.run/self-hosting)
+
+- [Cloudflare](https://synch.run/self-hosting)
+- [Docker/systemd（无需 Cloudflare）](https://synch.run/self-hosting-docker)
 
 ## 披露
 

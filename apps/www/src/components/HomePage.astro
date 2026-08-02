@@ -16,7 +16,6 @@ const defaultDemoPlaybackId =
   "wLFfexVomR006ejrrI0202jexidCGpEXbzuf801AKMlPh024";
 const demoPlaybackId =
   locale === "ko" ? koDemoPlaybackId : defaultDemoPlaybackId;
-const selfHostingHref = localizedPath(locale, "/self-hosting");
 const apiUrl = import.meta.env.PUBLIC_API_URL || "";
 const authBaseUrl = apiUrl || Astro.url.origin;
 const vaultsUrl = new URL("/vaults", authBaseUrl);
@@ -115,17 +114,36 @@ signupUrl.searchParams.set("lang", locale);
 
       <div class="mt-32 space-y-6">
         <div class="w-8 h-px bg-zinc-800"></div>
-        <div class="max-w-xl space-y-4">
+        <div class="max-w-2xl space-y-6">
           <h2 class="text-xl text-zinc-300 font-normal">
             {t.selfHosting.title}
           </h2>
-          <p class="text-zinc-500 leading-relaxed">{t.selfHosting.body}</p>
-          <a
-            href={selfHostingHref}
-            class="inline-flex items-center rounded border border-zinc-800 px-4 py-2 text-xs text-zinc-300 transition-all hover:border-zinc-700 hover:bg-zinc-900/60 hover:text-zinc-200"
-          >
-            {t.selfHosting.link}
-          </a>
+          <div class="grid gap-4 sm:grid-cols-2">
+            {t.selfHosting.options.map((option) => (
+              <a
+                href={localizedPath(locale, option.href)}
+                class="group flex h-full flex-col rounded-md border border-zinc-800/50 bg-zinc-900/20 p-5 transition-all hover:border-zinc-700/50 hover:bg-zinc-800/50"
+              >
+                <div class="flex items-start justify-between gap-4">
+                  <h3 class="font-normal text-zinc-300 group-hover:text-zinc-200">
+                    {option.title}
+                  </h3>
+                  <span
+                    aria-hidden="true"
+                    class="text-zinc-600 transition-transform group-hover:translate-x-0.5 group-hover:text-zinc-400"
+                  >
+                    ↗
+                  </span>
+                </div>
+                <p class="mt-3 flex-1 text-sm leading-relaxed text-zinc-500">
+                  {option.body}
+                </p>
+                <span class="mt-5 text-xs text-zinc-400 group-hover:text-zinc-300">
+                  {option.link}
+                </span>
+              </a>
+            ))}
+          </div>
         </div>
       </div>
 

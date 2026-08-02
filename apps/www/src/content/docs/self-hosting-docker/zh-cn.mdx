@@ -1,0 +1,127 @@
+---
+title: 不使用 Cloudflare 自托管 Synch
+description: 使用 Docker Compose 或普通 systemd 在自己的硬件上运行 Synch 服务器，无需 Cloudflare 或第三方服务。
+updatedDate: 2026-08-01
+---
+
+如果你完全不想使用 Cloudflare，Synch 服务器也可以作为普通 Node.js 进程运行。本指南介绍如何在自己的硬件上运行 Synch——例如家庭实验室 NAS、小型 VPS、Incus/LXC 容器，或任何能够运行长期进程并公开端口的环境——你可以选择使用 [Docker Compose](#使用-docker-compose-部署) 或 [systemd](#不使用-docker使用-systemd-运行)。
+
+所有数据都会存储在磁盘上：每个 vault 一个 SQLite 文件，另有一个用于账户和 vault 元数据的小型应用数据库。不需要 D1、Durable Objects 或 R2，只需将文件保存到你自己控制的目录中。
+
+如果你更希望部署到免费的 Cloudflare 账号，请参阅 [Cloudflare 自托管指南](/zh-cn/self-hosting/)。
+
+## 部署前准备
+
+无论选择哪种方式，你都需要让 Obsidian 设备能够访问服务器。你可以只在本地网络中使用，也可以通过互联网访问，以便在离家时同步。如果选择后者，请在 reverse proxy 后配置 TLS；服务器本身只提供普通 HTTP。
+
+## 使用 Docker Compose 部署
+
+你需要先安装 Docker 和 Docker Compose。
+
+1. 克隆仓库并进入 API 目录：
+
+   ```bash
+   git clone https://github.com/hjinco/synch.git
+   cd synch/apps/api
+   ```
+
+2. 复制示例环境文件：
+
+   ```bash
+   cp .env.example .env
+   ```
+
+3. 编辑 `.env` 并填写以下值：
+   - `PUBLIC_URL` - 客户端访问此服务器时使用的地址。例如，在局域网中可以使用 `http://192.168.1.50:8787`，在 reverse proxy 后可以使用 `https://synch.your-domain.example`。它必须完全匹配，包括 scheme 和端口，因为系统会用它验证传入请求的 origin。
+   - `BETTER_AUTH_SECRET` 和 `SYNC_TOKEN_SECRET` - 两个相互独立的随机 secret。分别使用以下命令生成：
+
+     ```bash
+     openssl rand -hex 32
+     ```
+
+4. 启动服务器：
+
+   ```bash
+   docker compose up -d
+   ```
+
+重启和升级后，vault 与 blob 数据都会保存在 `synch-data` Docker 卷中。迁移到新主机时，请同时复制此卷和 `.env` 文件。
+
+### Blob 存储
+
+默认情况下，加密的文件内容会存储在同一个数据卷的磁盘中。如果希望使用 AWS S3、MinIO、R2 等 S3 兼容存储桶，请在启动前取消 `.env` 中 `BLOB_STORAGE=s3` 配置块的注释并填写相应值。
+
+### 升级
+
+```bash
+git pull
+docker compose up -d --build
+```
+
+数据库迁移会在启动时自动运行。
+
+## 不使用 Docker，使用 systemd 运行
+
+服务器只是一个 Node.js 进程（`src/self-host.ts`），通过 [tsx](https://tsx.is/) 运行。Docker 只是方便的选择，并非必需。如果你已经在使用 VM（例如 Incus/LXC 容器），又不想增加 Docker 依赖，这种方式会比较合适。
+
+在 Debian/Ubuntu 上，[`install.sh`](https://github.com/hjinco/synch/blob/main/apps/api/install.sh) 可以自动完成以下步骤。克隆仓库后，运行 `cd apps/api && sudo ./install.sh`。之后运行 `git pull` 时可以安全地再次执行它来更新并重启服务。手动设置时，请按以下步骤操作：
+
+1. 安装 Node.js 24 和构建工具链。如果没有适用于你的 VM 架构或 libc 的预构建二进制文件，这些工具用于构建 `better-sqlite3` 的原生模块：
+
+   ```bash
+   # Debian/Ubuntu
+   sudo apt install -y nodejs python3 make g++
+   sudo corepack enable
+   ```
+
+2. 克隆仓库并安装生产环境依赖：
+
+   ```bash
+   git clone https://github.com/hjinco/synch.git /opt/synch
+   cd /opt/synch/apps/api
+   pnpm install --frozen-lockfile --filter @synch/api... --prod
+   ```
+
+3. 将 `.env.example` 复制为 `.env`，并按照上面 Docker Compose 步骤中的说明填写配置。
+
+4. 安装并启动[示例 systemd unit](https://github.com/hjinco/synch/blob/main/apps/api/synch-api.service.example)：
+
+   ```bash
+   sudo useradd --system --home /var/lib/synch-api --create-home synch
+   sudo cp synch-api.service.example /etc/systemd/system/synch-api.service
+   # 如果没有使用 /opt/synch 或 synch 用户，请编辑 unit 中的路径/User/Group
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now synch-api
+   ```
+
+5. 检查服务是否正常运行：
+
+   ```bash
+   curl http://localhost:8787/health
+   sudo journalctl -u synch-api -f
+   ```
+
+### 升级（systemd）
+
+```bash
+cd /opt/synch
+git pull
+cd apps/api
+pnpm install --frozen-lockfile --filter @synch/api... --prod
+sudo systemctl restart synch-api
+```
+
+### 仅绑定到 localhost
+
+默认情况下，服务器会监听 `0.0.0.0`（所有接口）。Docker Compose 发布端口时需要此设置。如果你希望将 systemd 部署放在本地 reverse proxy（例如 [`tailscale serve`](https://tailscale.com/kb/1242/tailscale-serve)、nginx 或 Caddy）后面，并且不希望服务器直接暴露在局域网或公共接口上，请在 `.env` 中设置 `HOST=127.0.0.1`。示例 systemd unit 和 `install.sh` 已经为你设置了这一点。
+
+修改后，将 `PUBLIC_URL` 更新为客户端实际连接的地址（reverse proxy 的地址，而不是 `127.0.0.1`），然后重启服务。better-auth 使用 `PUBLIC_URL` 验证传入请求的 origin。
+
+## 连接 Obsidian
+
+1. 打开 Obsidian。
+2. 进入 **Settings**。
+3. 打开 **Synch** 设置。
+4. 在 **Self-hosted server** 中粘贴服务器的 `PUBLIC_URL`。末尾不要添加 `/`。
+5. 点击 **Save**。
+6. 继续按照平常的方式登录并设置 vault。
