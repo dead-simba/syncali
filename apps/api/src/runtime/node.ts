@@ -48,6 +48,7 @@ export interface NodeRuntimeConfig {
 	publicUrl: string;
 	corsOrigin?: string;
 	betterAuthSecret: string;
+	authAllowedEmails: string;
 	syncTokenSecret: string;
 	syncTokenTtlSeconds?: number;
 	blobStorage: BlobStorage;
@@ -114,6 +115,7 @@ export async function createNodeRuntime(config: NodeRuntimeConfig) {
 		selfHosted: true,
 		devMode: false,
 		secret: config.betterAuthSecret,
+		allowedEmails: config.authAllowedEmails,
 	});
 
 	const syncTokenService = new SyncTokenService(config.syncTokenSecret);

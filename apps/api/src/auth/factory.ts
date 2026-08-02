@@ -1,11 +1,17 @@
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { betterAuth } from "better-auth";
+import { APIError } from "better-auth/api";
 import type { BetterAuthPlugin } from "better-auth";
 import { bearer, deviceAuthorization, organization } from "better-auth/plugins";
 import { eq } from "drizzle-orm";
 
 import type { AppDb } from "../db/client";
 import * as schema from "../db/d1";
+import {
+	isEmailAllowed,
+	parseAllowedEmails,
+	SIGN_UP_EMAIL_NOT_ALLOWED,
+} from "./allowed-emails";
 import { getDeviceVerificationUri } from "./device";
 import { createEmailVerificationConfig } from "./email";
 import {
@@ -22,6 +28,8 @@ export type AuthConfig = {
 	secret?: string;
 	email?: SendEmail;
 	emailFrom?: string;
+	/** Comma-separated email addresses allowed to create accounts. Blank or omitted keeps sign-up open. */
+	allowedEmails?: string;
 	plugins?: BetterAuthPlugin[];
 };
 
@@ -30,6 +38,7 @@ const SESSION_EXPIRES_IN_SECONDS = 60 * 60 * 24 * 30;
 
 export function createAuth(db: AppDb, config: AuthConfig) {
 	const emailVerification = createEmailVerificationConfig(config);
+	const allowedEmails = parseAllowedEmails(config.allowedEmails);
 	const auth = betterAuth({
 		baseURL: config.baseURL,
 		secret: config.secret,
@@ -49,6 +58,11 @@ export function createAuth(db: AppDb, config: AuthConfig) {
 		databaseHooks: {
 			user: {
 				create: {
+					before: async (user) => {
+						if (allowedEmails && !isEmailAllowed(user.email, allowedEmails)) {
+							throw APIError.from("FORBIDDEN", SIGN_UP_EMAIL_NOT_ALLOWED);
+						}
+					},
 					after: async (user) => {
 						if (await readDefaultOrganizationIdForUserId(db, user.id)) {
 							return;

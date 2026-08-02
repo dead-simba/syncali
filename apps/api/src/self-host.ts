@@ -49,6 +49,7 @@ async function main(): Promise<void> {
 		publicUrl,
 		corsOrigin: process.env.CORS_ORIGIN,
 		betterAuthSecret: requireEnv("BETTER_AUTH_SECRET"),
+		authAllowedEmails: requireEnv("AUTH_ALLOWED_EMAILS"),
 		syncTokenSecret: requireEnv("SYNC_TOKEN_SECRET"),
 		syncTokenTtlSeconds: process.env.SYNC_TOKEN_TTL_SECONDS
 			? Number(process.env.SYNC_TOKEN_TTL_SECONDS)

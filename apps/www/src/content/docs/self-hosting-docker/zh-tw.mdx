@@ -1,7 +1,7 @@
 ---
 title: 不使用 Cloudflare 自行託管 Synch
 description: 使用 Docker Compose 或一般 systemd 在自己的硬體上執行 Synch 伺服器，不需要 Cloudflare 或第三方服務。
-updatedDate: 2026-08-01
+updatedDate: 2026-08-02
 ---
 
 如果你完全不想使用 Cloudflare，Synch 伺服器也可以作為一般 Node.js 程序執行。本指南介紹如何在自己的硬體上執行 Synch——例如家用實驗室 NAS、小型 VPS、Incus/LXC 容器，或任何能夠執行長時間程序並公開連接埠的環境——你可以選擇使用 [Docker Compose](#使用-docker-compose-部署) 或 [systemd](#不使用-docker使用-systemd-執行)。
@@ -38,6 +38,13 @@ updatedDate: 2026-08-01
      ```bash
      openssl rand -hex 32
      ```
+   - `AUTH_ALLOWED_EMAILS`（必填）- 以逗號分隔可建立帳戶的確切電子郵件地址。
+
+     ```text
+     AUTH_ALLOWED_EMAILS=you@example.com,family@example.com
+     ```
+
+     比對時會忽略字母大小寫與前後空白。此設定只限制新帳戶，因此從清單移除地址後，現有使用者仍可登入。
 
 4. 啟動伺服器：
 

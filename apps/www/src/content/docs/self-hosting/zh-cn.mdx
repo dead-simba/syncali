@@ -1,7 +1,7 @@
 ---
 title: 在 Cloudflare 上自托管 Synch
 description: 在 Cloudflare 上创建你自己的 Synch 服务器，并连接到 Obsidian 插件。
-updatedDate: 2026-05-09
+updatedDate: 2026-08-02
 ---
 
 import SecretGenerator from "../../../components/SecretGenerator.astro";
@@ -21,7 +21,8 @@ import SecretGenerator from "../../../components/SecretGenerator.astro";
 1. 点击 **Deploy to Cloudflare**。
 2. 登录 Cloudflare，并选择要使用的账号。
 3. 按照提示把 GitHub 账号连接到 Cloudflare。
-4. 到达 secret 输入页面后，填写下面两个值。
+4. 到达 secret 输入页面后，填写下面三个值。
+   - `AUTH_ALLOWED_EMAILS` - 用逗号分隔可创建账户的电子邮箱地址，例如 `you@example.com,family@example.com`
    - `BETTER_AUTH_SECRET`
    - `SYNC_TOKEN_SECRET`
 
@@ -29,7 +30,7 @@ import SecretGenerator from "../../../components/SecretGenerator.astro";
 
 5. 点击 **Deploy** 开始部署，并等待部署完成。
 
-![显示 Better Auth 和 sync token secret 输入框的 Deploy to Cloudflare 表单](./cloudflare-deploy-secrets.png)
+![显示必填 secret 输入框的 Deploy to Cloudflare 表单](./cloudflare-deploy-secrets.png)
 
 ## 连接 Obsidian
 

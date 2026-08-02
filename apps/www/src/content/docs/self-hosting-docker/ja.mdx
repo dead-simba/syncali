@@ -1,7 +1,7 @@
 ---
 title: Cloudflare を使わずに Synch をセルフホスト
 description: Docker Compose または systemd で自分のハードウェア上に Synch サーバーを実行できます。Cloudflare やサードパーティサービスは必要ありません。
-updatedDate: 2026-08-01
+updatedDate: 2026-08-02
 ---
 
 Cloudflare をまったく使いたくない場合、Synch のサーバーは通常の Node.js プロセスとしても実行できます。このガイドでは、ホームラボの NAS、小規模な VPS、Incus/LXC コンテナなど、長時間稼働するプロセスを実行してポートを公開できる自分のハードウェア上で、[Docker Compose](#docker-compose-で-デプロイ) または [systemd](#docker-なしで-systemd-を実行) を使って Synch を実行する方法を説明します。
@@ -38,6 +38,13 @@ Docker と Docker Compose をインストールしておく必要があります
      ```bash
      openssl rand -hex 32
      ```
+   - `AUTH_ALLOWED_EMAILS`（必須）- アカウント作成を許可する正確なメールアドレスをカンマ区切りで指定します。
+
+     ```text
+     AUTH_ALLOWED_EMAILS=you@example.com,family@example.com
+     ```
+
+     比較では大文字と小文字、および前後の空白を無視します。この設定は新規アカウントの作成だけを制限するため、リストからアドレスを削除しても既存ユーザーは引き続きサインインできます。
 
 4. サーバーを起動します。
 

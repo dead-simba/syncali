@@ -2,7 +2,11 @@ import { expect } from "vitest";
 
 import { createRuntimeApp } from "../../../src/runtime";
 
-export type RuntimeTestEnv = Omit<Env, "AUTH_EMAIL_FROM" | "DEV_MODE" | "EMAIL"> & {
+export type RuntimeTestEnv = Omit<
+	Env,
+	"AUTH_ALLOWED_EMAILS" | "AUTH_EMAIL_FROM" | "DEV_MODE" | "EMAIL"
+> & {
+	AUTH_ALLOWED_EMAILS?: string;
 	EMAIL?: SendEmail;
 	AUTH_EMAIL_FROM?: string;
 	DEV_MODE?: boolean | string;

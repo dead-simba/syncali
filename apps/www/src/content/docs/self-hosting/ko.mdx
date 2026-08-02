@@ -1,7 +1,7 @@
 ---
 title: Cloudflare에서 Synch 셀프 호스팅하기
 description: Cloudflare에 내 Synch 서버를 만들고 Obsidian 플러그인에 연결하는 방법입니다.
-updatedDate: 2026-05-09
+updatedDate: 2026-08-02
 ---
 
 import SecretGenerator from "../../../components/SecretGenerator.astro";
@@ -21,7 +21,8 @@ Cloudflare 무료 계정으로 시작할 수 있습니다. 다만 Cloudflare 계
 1. **Deploy to Cloudflare**를 클릭합니다.
 2. Cloudflare에 로그인한 뒤 사용할 계정을 선택합니다.
 3. 안내에 따라 GitHub 계정을 Cloudflare에 연결합니다.
-4. secret을 입력하는 화면이 나오면 아래 두 값을 넣습니다.
+4. secret을 입력하는 화면이 나오면 아래 세 값을 넣습니다.
+   - `AUTH_ALLOWED_EMAILS` - 계정을 만들 수 있는 이메일 주소를 쉼표로 구분한 값입니다. 예: `you@example.com,family@example.com`
    - `BETTER_AUTH_SECRET`
    - `SYNC_TOKEN_SECRET`
 
@@ -29,7 +30,7 @@ Cloudflare 무료 계정으로 시작할 수 있습니다. 다만 Cloudflare 계
 
 5. **Deploy** 버튼을 눌러 배포를 시작하고, 완료될 때까지 기다립니다.
 
-![Better Auth와 sync token secret 입력란이 보이는 Deploy to Cloudflare 폼](./cloudflare-deploy-secrets.png)
+![필수 secret 입력란이 보이는 Deploy to Cloudflare 폼](./cloudflare-deploy-secrets.png)
 
 ## Obsidian에 연결하기
 

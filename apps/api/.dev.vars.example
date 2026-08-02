@@ -1,2 +1,3 @@
 BETTER_AUTH_SECRET=replace-with-random-hex
 SYNC_TOKEN_SECRET=replace-with-different-random-hex
+AUTH_ALLOWED_EMAILS=developer@example.com

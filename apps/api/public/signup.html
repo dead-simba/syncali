@@ -84,6 +84,7 @@
 					apiUnavailableWithHint: "Unable to reach the API. Check the server URL and try again.",
 					creatingAccount: "Creating account...",
 					accountCreationFailed: "Account creation failed.",
+					emailNotAllowed: "This email address is not allowed to sign up.",
 					emailSent: "Email Sent",
 					createdRedirecting: "Account created. Redirecting...",
 					requestFailed: "Request failed.",
@@ -109,6 +110,7 @@
 					apiUnavailableWithHint: "API에 연결할 수 없습니다. 서버 URL을 확인한 뒤 다시 시도하세요.",
 					creatingAccount: "계정 만드는 중...",
 					accountCreationFailed: "계정을 만들지 못했습니다.",
+					emailNotAllowed: "이 이메일 주소는 가입이 허용되지 않았습니다.",
 					emailSent: "이메일 전송됨",
 					createdRedirecting: "계정이 생성되었습니다. 이동 중...",
 					requestFailed: "요청에 실패했습니다.",
@@ -134,6 +136,7 @@
 					apiUnavailableWithHint: "APIに接続できません。サーバーURLを確認してから再試行してください。",
 					creatingAccount: "アカウントを作成中...",
 					accountCreationFailed: "アカウントを作成できませんでした。",
+					emailNotAllowed: "このメールアドレスは登録を許可されていません。",
 					emailSent: "メールを送信しました",
 					createdRedirecting: "アカウントを作成しました。移動中...",
 					requestFailed: "リクエストに失敗しました。",
@@ -159,6 +162,7 @@
 					apiUnavailableWithHint: "无法连接 API。请检查服务器 URL 后重试。",
 					creatingAccount: "正在创建账户...",
 					accountCreationFailed: "账户创建失败。",
+					emailNotAllowed: "此电子邮箱地址不允许注册。",
 					emailSent: "邮件已发送",
 					createdRedirecting: "账户已创建。正在跳转...",
 					requestFailed: "请求失败。",
@@ -184,6 +188,7 @@
 					apiUnavailableWithHint: "無法連接 API。請檢查伺服器 URL 後再試一次。",
 					creatingAccount: "正在建立帳戶...",
 					accountCreationFailed: "帳戶建立失敗。",
+					emailNotAllowed: "此電子郵件地址不允許註冊。",
 					emailSent: "電子郵件已傳送",
 					createdRedirecting: "帳戶已建立。正在前往...",
 					requestFailed: "請求失敗。",
@@ -428,6 +433,7 @@
 			async function readErrorMessage(response, fallback = t("requestFailed")) {
 				try {
 					const json = await response.json();
+					if (json.code === "SIGN_UP_EMAIL_NOT_ALLOWED") return t("emailNotAllowed");
 					return json.message || json.error_description || json.error || fallback;
 				} catch {
 					return fallback;

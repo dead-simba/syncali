@@ -63,6 +63,7 @@
 	},
 	"secrets": {
 		"required": [
+			"AUTH_ALLOWED_EMAILS",
 			"BETTER_AUTH_SECRET",
 			"SYNC_TOKEN_SECRET"
 		]

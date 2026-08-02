@@ -25,6 +25,9 @@
 	},
 	"cloudflare": {
 		"bindings": {
+			"AUTH_ALLOWED_EMAILS": {
+				"description": "Comma-separated email addresses allowed to create accounts, for example `you@example.com,family@example.com`."
+			},
 			"BETTER_AUTH_SECRET": {
 				"description": "Generate a random secret for Better Auth session signing, for example `openssl rand -hex 32`."
 			},

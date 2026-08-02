@@ -36,6 +36,8 @@ const DEFAULT_VAULT_WRAPPER = {
 	},
 };
 
+const SELF_HOST_ALLOWED_EMAIL = "self-host-e2e@test.invalid";
+
 let counter = 0;
 function uniqueId(prefix: string): string {
 	counter += 1;
@@ -69,6 +71,7 @@ async function bootServer(existingDataDir?: string) {
 		dataDir,
 		publicUrl: baseUrl,
 		betterAuthSecret: "test-secret-test-secret-test-secret",
+		authAllowedEmails: SELF_HOST_ALLOWED_EMAIL,
 		syncTokenSecret: "test-sync-token-secret-test-sync",
 		blobStorage: new LocalDiskBlobStorage(path.join(dataDir, "blobs")),
 	});
@@ -121,12 +124,13 @@ async function bootSubprocessServer(dataDir: string): Promise<{ baseUrl: string;
 	// (via a negative pid, see `killAndWaitForExit`) reaches it too.
 	const child = spawn(TSX_BIN, ["src/self-host.ts"], {
 		cwd: API_ROOT,
-		env: {
+			env: {
 			...process.env,
 			DATA_DIR: dataDir,
 			PORT: String(port),
 			PUBLIC_URL: baseUrl,
 			BETTER_AUTH_SECRET: "test-secret-test-secret-test-secret",
+			AUTH_ALLOWED_EMAILS: SELF_HOST_ALLOWED_EMAIL,
 			SYNC_TOKEN_SECRET: "test-sync-token-secret-test-sync",
 		},
 		stdio: ["ignore", "pipe", "pipe"],
@@ -168,7 +172,7 @@ function killAndWaitForExit(child: ChildProcess): Promise<void> {
 }
 
 async function signUpAndCreateVault(baseUrl: string) {
-	const email = `${uniqueId("e2e")}@test.invalid`;
+	const email = SELF_HOST_ALLOWED_EMAIL;
 	const signUp = await fetch(`${baseUrl}/api/auth/sign-up/email`, {
 		method: "POST",
 		headers: { "content-type": "application/json", origin: baseUrl },

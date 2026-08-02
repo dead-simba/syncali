@@ -1,7 +1,7 @@
 ---
 title: Self-host Synch on Cloudflare
 description: Create your own Synch server on Cloudflare and connect the Obsidian plugin to it.
-updatedDate: 2026-05-09
+updatedDate: 2026-08-02
 ---
 
 import SecretGenerator from "../../../components/SecretGenerator.astro";
@@ -23,7 +23,8 @@ You can start with a free Cloudflare account. If your Cloudflare account is new,
 1. Click **Deploy to Cloudflare**.
 2. Sign in to Cloudflare and choose the account you want to use.
 3. Follow the prompts to connect your GitHub account to Cloudflare.
-4. When you reach the secrets screen, enter these two values:
+4. When you reach the secrets screen, enter these three values:
+   - `AUTH_ALLOWED_EMAILS` - comma-separated email addresses allowed to create accounts, for example `you@example.com,family@example.com`
    - `BETTER_AUTH_SECRET`
    - `SYNC_TOKEN_SECRET`
 
@@ -31,7 +32,7 @@ You can start with a free Cloudflare account. If your Cloudflare account is new,
 
 5. Click **Deploy** to start, then wait for the deployment to complete.
 
-![Deploy to Cloudflare form showing Better Auth and sync token secret fields](./cloudflare-deploy-secrets.png)
+![Deploy to Cloudflare form showing the required secret fields](./cloudflare-deploy-secrets.png)
 
 ## Connect Obsidian
 

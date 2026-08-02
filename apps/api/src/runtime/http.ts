@@ -21,8 +21,14 @@ import { VaultService } from "../vault/service";
 
 type RuntimeEnv = Omit<
 	Env,
-	"AUTH_EMAIL_FROM" | "DEV_MODE" | "EMAIL" | "POLICY_REFRESH_QUEUE" | "VAULT_PURGE_QUEUE"
+	| "AUTH_ALLOWED_EMAILS"
+	| "AUTH_EMAIL_FROM"
+	| "DEV_MODE"
+	| "EMAIL"
+	| "POLICY_REFRESH_QUEUE"
+	| "VAULT_PURGE_QUEUE"
 > & {
+	AUTH_ALLOWED_EMAILS?: string;
 	EMAIL?: SendEmail;
 	AUTH_EMAIL_FROM?: string;
 	DEV_MODE?: boolean | string;
@@ -78,6 +84,9 @@ export function createRuntimeApp(env: RuntimeEnv, request: Request) {
 		devMode,
 		email: env.EMAIL,
 		emailFrom: env.AUTH_EMAIL_FROM,
+		allowedEmails: env.SELF_HOSTED
+			? requireNonBlankStringBinding(env.AUTH_ALLOWED_EMAILS, "AUTH_ALLOWED_EMAILS")
+			: undefined,
 		plugins: polarAuthPlugin ? [polarAuthPlugin] : [],
 	});
 	const blobRepository = new BlobRepository(env.SYNC_BLOBS);
@@ -176,6 +185,14 @@ class InlineVaultPurgeQueue implements VaultPurgeQueue {
 
 function requireBinding<T>(binding: T | undefined, name: string): T {
 	if (!binding) {
+		throw new Error(`${name} binding is required`);
+	}
+
+	return binding;
+}
+
+function requireNonBlankStringBinding(binding: string | undefined, name: string): string {
+	if (!binding?.trim()) {
 		throw new Error(`${name} binding is required`);
 	}
 

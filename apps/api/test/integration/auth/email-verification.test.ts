@@ -88,10 +88,12 @@ describe("auth email verification integration", () => {
 	});
 
 	it("keeps self-hosted sign-up independent from email configuration", async () => {
+		const accountEmail = `${uniqueId("self-hosted-auth")}@example.com`;
 		const testEnv: RuntimeTestEnv = {
 			...env,
 			SELF_HOSTED: true,
 			EMAIL: undefined,
+			AUTH_ALLOWED_EMAILS: accountEmail,
 		};
 
 		const signUp = await jsonRequestWithEnv<{ token: string | null }>(
@@ -104,7 +106,7 @@ describe("auth email verification integration", () => {
 				},
 				body: JSON.stringify({
 					name: "Self Hosted User",
-					email: `${uniqueId("self-hosted-auth")}@example.com`,
+					email: accountEmail,
 					password: "supersecret123",
 				}),
 			},
@@ -113,6 +115,58 @@ describe("auth email verification integration", () => {
 		expect(signUp.response.status).toBe(200);
 		expect(signUp.json?.token).toBeTruthy();
 		expect(extractCookieHeader(signUp.response)).toContain("better-auth.session_token=");
+	});
+
+	it.each([undefined, "   "])(
+		"fails closed when the self-hosted email allowlist is %s",
+		async (authAllowedEmails) => {
+			const testEnv: RuntimeTestEnv = {
+				...env,
+				SELF_HOSTED: true,
+				AUTH_ALLOWED_EMAILS: authAllowedEmails,
+			};
+
+			await expect(requestWithEnv("/health", testEnv)).rejects.toThrow(
+				"AUTH_ALLOWED_EMAILS binding is required",
+			);
+		},
+	);
+
+	it("restricts self-hosted sign-up to the configured email allowlist", async () => {
+		const allowedEmail = `${uniqueId("allowed-self-hosted-auth")}@example.com`;
+		const testEnv: RuntimeTestEnv = {
+			...env,
+			SELF_HOSTED: true,
+			EMAIL: undefined,
+			AUTH_ALLOWED_EMAILS: ` OTHER@example.com, ${allowedEmail.toUpperCase()} `,
+		};
+		const signUp = (email: string) =>
+			jsonRequestWithEnv<{ token?: string; code?: string; message?: string }>(
+				"/api/auth/sign-up/email",
+				testEnv,
+				{
+					method: "POST",
+					headers: { "content-type": "application/json" },
+					body: JSON.stringify({
+						name: "Self Hosted User",
+						email,
+						password: "supersecret123",
+					}),
+				},
+			);
+
+		const denied = await signUp(`${uniqueId("denied-self-hosted-auth")}@example.com`);
+		expect(denied.response.status).toBe(403);
+		expect(denied.json).toMatchObject({
+			code: "SIGN_UP_EMAIL_NOT_ALLOWED",
+			message: "This email address is not allowed to sign up.",
+		});
+		expect(extractCookieHeader(denied.response)).not.toContain("better-auth.session_token=");
+
+		const allowed = await signUp(allowedEmail);
+		expect(allowed.response.status).toBe(200);
+		expect(allowed.json?.token).toBeTruthy();
+		expect(extractCookieHeader(allowed.response)).toContain("better-auth.session_token=");
 	});
 });
 
