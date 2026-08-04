@@ -92,7 +92,10 @@ export const SUBSCRIPTION_PLAN_POLICIES = {
 			syncedVaults: 0,
 			storageLimitBytes: 0,
 			maxFileSizeBytes: 0,
-			versionHistoryRetentionDays: 1,
+			// Storage is uncapped when self-hosting, so the free plan's 1 day
+			// was the wrong inheritance: it made deleted-file recovery expire
+			// overnight on a deployment paying for its own disk.
+			versionHistoryRetentionDays: 30,
 		},
 		features: {
 			snapshots: true,

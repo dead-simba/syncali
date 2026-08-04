@@ -29,7 +29,10 @@ describe("SubscriptionPolicyService", () => {
 		expect(policy.limits.syncedVaults).toBe(0);
 		expect(policy.limits.storageLimitBytes).toBe(0);
 		expect(policy.limits.maxFileSizeBytes).toBe(0);
-		expect(policy.limits.versionHistoryRetentionDays).toBe(1);
+		// Not 0: retention is a real number of days, not an "unlimited" sentinel.
+		// Self-hosting pays for its own storage, so it gets the long window
+		// rather than the free plan's overnight expiry.
+		expect(policy.limits.versionHistoryRetentionDays).toBe(30);
 	});
 
 	it("defines the hosted starter plan limits", () => {

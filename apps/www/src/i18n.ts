@@ -139,6 +139,11 @@ export const ui = {
 			featuredTitle: "Worth reading",
 			featuredPosts: [
 				{
+					title: "What happens when two devices disagree",
+					body: "Which version wins when you edit the same note twice, why an empty note can eat your writing in other tools, and where conflict copies actually appear.",
+					href: "/blog/what-happens-when-two-devices-disagree"
+				},
+				{
 					title: "How the encryption actually works",
 					body: "A plain-English walkthrough of what gets encrypted, where the key lives, and what the server can still see.",
 					href: "/blog/encryption-and-decryption"
