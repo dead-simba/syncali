@@ -1,6 +1,6 @@
 {
-  "id": "synch",
-  "name": "Synchrun",
+  "id": "synchali",
+  "name": "Synchali",
   "version": "0.3.0",
   "minAppVersion": "1.11.4",
   "description": "Sync your vault across devices with end-to-end encryption.",

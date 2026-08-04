@@ -21,12 +21,12 @@ import { decryptSyncMetadata, encryptSyncMetadata } from "../sync/core/crypto";
 export function createTestPlugin(): Plugin {
   let data: unknown = null;
   const localStorage = new Map<string, unknown>();
-  const directories = new Set([".obsidian/plugins/synch"]);
+  const directories = new Set([".obsidian/plugins/synchali"]);
   const files = new Map<string, string | Uint8Array>();
 
   return {
     manifest: {
-      dir: ".obsidian/plugins/synch",
+      dir: ".obsidian/plugins/synchali",
     },
     app: {
       loadLocalStorage(key: string): unknown | null {

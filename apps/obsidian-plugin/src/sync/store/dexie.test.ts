@@ -499,7 +499,7 @@ function createPlugin(): TestPlugin {
 
   return {
     manifest: {
-      dir: ".obsidian/plugins/synch",
+      dir: ".obsidian/plugins/synchali",
     },
     app: {
       loadLocalStorage(key: string): unknown | null {

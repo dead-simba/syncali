@@ -480,12 +480,12 @@ function createPlugin(
   visibleFiles: TFile[] = [createFile("note.md")],
 ): Plugin {
   const localStorage = new Map<string, unknown>();
-  const directories = new Set([".obsidian/plugins/synch"]);
+  const directories = new Set([".obsidian/plugins/synchali"]);
   const files = new Map<string, string | Uint8Array>();
 
   return {
     manifest: {
-      dir: ".obsidian/plugins/synch",
+      dir: ".obsidian/plugins/synchali",
     },
     registerEvent: vi.fn(),
     app: {

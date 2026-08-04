@@ -36,6 +36,13 @@ async function main() {
 		"local-vault-b",
 	);
 
+	// The coordinator only materializes vault state when a socket connects
+	// (VaultLifecycleService.ensureVaultState via SocketConnectionService), so the
+	// blob upload has to come after the sockets or stageBlob rejects the fresh
+	// vault with sync_state_uninitialized (409).
+	const socketA = await openSocket(socketUrl(baseUrl, vaultId), tokenA.token);
+	const socketB = await openSocket(socketUrl(baseUrl, vaultId), tokenB.token);
+
 	const blobId = `blob-smoke-${uniqueSuffix}`;
 	const blobBytes = new TextEncoder().encode("smoke blob bytes");
 	const uploaded = await fetch(`${baseUrl}/v1/vaults/${encodeURIComponent(vaultId)}/blobs/${blobId}`, {
@@ -47,9 +54,6 @@ async function main() {
 		body: blobBytes,
 	});
 	assert(uploaded.ok, `blob upload failed: ${uploaded.status}`);
-
-	const socketA = await openSocket(socketUrl(baseUrl, vaultId), tokenA.token);
-	const socketB = await openSocket(socketUrl(baseUrl, vaultId), tokenB.token);
 
 	const helloA = await sendSocketRequest(
 		socketA,

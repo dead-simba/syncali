@@ -26,7 +26,10 @@ export const DEFAULT_VAULT_CONFIG_SYNC_RULES: VaultConfigSyncRules = {
   communityPluginData: false,
 };
 
-const SYNCH_PLUGIN_CONFIG_PREFIX = "plugins/synch/";
+// Must stay in sync with `id` in manifest.json. This is what stops the plugin
+// from syncing its own folder (main.js, and the device-local data.json holding
+// this device's excluded folders and vault binding) when config sync is on.
+const SYNCH_PLUGIN_CONFIG_PREFIX = "plugins/synchali/";
 const DEVICE_LOCAL_CONFIG_PATHS = new Set([
   "workspace.json",
   "workspace-mobile.json",
