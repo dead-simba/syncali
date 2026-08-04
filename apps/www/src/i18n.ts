@@ -96,62 +96,109 @@ export const ui = {
 			privacy: "Privacy",
 		},
 		home: {
-			heroTitle: ["End-to-end encrypted sync", "for Obsidian."],
-			featuredTitle: "Learn more",
-			featuredPosts: [
-				{
-					title: "How does Synch's end-to-end encryption work?",
-					body: "A plain-English walkthrough of how Synch encrypts vault data, protects the vault key, and unlocks encrypted data on another device.",
-					href: "/blog/encryption-and-decryption"
-				}
-			],
+			// Copy follows docs/copy-style.md: say what it does first, stay concrete,
+			// dry over zany, and never oversell what the encryption covers.
+			heroTitle: ["Your notes, on every device.", "On a server you own."],
 			heroBody:
-				"An open-source alternative to Obsidian Sync. Your notes are encrypted locally before leaving your device, ensuring complete privacy and control over your data.",
-			getStarted: "Get Started",
-			viewSource: "View Source",
-			features: [
+				"Syncali syncs your Obsidian vault between your computers and your phone. Everything is encrypted on your device before it leaves, so the server holds nothing readable \u2014 including ours, if you use ours. Run it on Cloudflare's free tier and it costs you nothing.",
+			heroNote:
+				"Open source, MIT licensed, and a fork of Synch by hjinco.",
+			getStarted: "Start syncing",
+			viewSource: "Read the source",
+			demoCaption:
+				"Editing on a laptop, landing on a phone. No refresh button, no export step.",
+			showcaseTitle: "See it work",
+			showcaseBody:
+				"Short clips, no narration. Skip any of them and you have lost nothing.",
+			showcase: [
 				{
-					title: "Sync in 3 seconds",
-					body: "Synch checks for changes frequently so edits can move between devices in just a few seconds.",
+					title: "Desktop to phone",
+					body: "Type a line on your Mac, watch it appear on Android a few seconds later.",
+					media: "/media/desktop-to-mobile.mp4",
+					poster: "/media/desktop-to-mobile.webp",
+				},
+				{
+					title: "Getting a deleted note back",
+					body: "Deleted files stay recoverable for your retention window. Pick it, preview it, restore it.",
+					media: "/media/deleted-files.mp4",
+					poster: "/media/deleted-files.webp",
 				},
 				{
 					title: "Version history",
-					body: "Recover from accidental edits with encrypted history for synced files, available within your plan's retention window.",
+					body: "Every synced edit is kept. Compare an old version against the current file before you roll back.",
+					media: "/media/version-history.mp4",
+					poster: "/media/version-history.webp",
 				},
 				{
-					title: "Deleted file recovery",
-					body: "Bring back deleted notes and attachments while they are still kept in version history.",
-				},
-				{
-					title: "Automatic conflict merges",
-					body: "When the same note changes on multiple devices, Synch uses a 3-way merge to combine compatible edits automatically.",
+					title: "Two devices, one note, no data lost",
+					body: "Edit the same note in two places. Compatible changes merge. Anything that truly clashes becomes a conflict copy instead of a coin flip.",
+					media: "/media/conflict-merge.mp4",
+					poster: "/media/conflict-merge.webp",
 				},
 			],
-			installTitle: "How to Install",
-			installIntro: "Install Synchrun from Obsidian's Community Plugins directory.",
+			featuredTitle: "Worth reading",
+			featuredPosts: [
+				{
+					title: "How the encryption actually works",
+					body: "A plain-English walkthrough of what gets encrypted, where the key lives, and what the server can still see.",
+					href: "/blog/encryption-and-decryption"
+				}
+			],
+			features: [
+				{
+					title: "Fast enough to forget about",
+					body: "Edits move between devices in about three seconds over a live connection. There is no sync button, because you should not need one.",
+				},
+				{
+					title: "Undo yesterday",
+					body: "Every synced change is kept for your retention window, encrypted like everything else. Compare, then restore.",
+				},
+				{
+					title: "Deleted is not gone",
+					body: "Notes and attachments you delete stay recoverable until history expires. Deleting a remote vault never touches your local files.",
+				},
+				{
+					title: "Conflicts resolved properly",
+					body: "Change the same note on two devices and a three-way merge combines the parts that do not overlap. When they do overlap, you get both versions rather than a guess.",
+				},
+				{
+					title: "Your phone, your rules",
+					body: "Choose which file types sync per device. Leave 4K screen recordings on the desktop where they belong.",
+				},
+				{
+					title: "Nothing to trust us with",
+					body: "Your notes and file paths are encrypted before upload. File sizes, timestamps and storage totals are not, and we would rather tell you than let you assume.",
+				},
+			],
+			installTitle: "Getting it installed",
+			installIntro: "Syncali installs from a GitHub release using BRAT, Obsidian's beta plugin installer.",
 			installSteps: [
-				["Open Obsidian Settings and go to", "Community plugins", "."],
-				["Turn off Restricted mode, then select", "Browse", "."],
-				["Search for", "Synchrun", ", select it, and choose Install."],
-				["Enable", "Synchrun", " after installation finishes."],
+				["Open Obsidian settings and go to", "Community plugins", "."],
+				["Turn off Restricted mode, then install", "BRAT", " from Browse."],
+				["In BRAT, choose", "Add beta plugin", " and paste this repository."],
+				["Enable", "Syncali", ", then point it at your server."],
 			],
 			selfHosting: {
-				title: "Use your own Synch server",
+				title: "Run your own server",
 				options: [
 					{
 						title: "Cloudflare",
-						body: "Deploy Synch to a free Cloudflare account and connect the plugin with your server URL.",
+						body: "Deploy to a free Cloudflare account in a few minutes. Storage, file size and vault count are all unlimited when you host it yourself.",
 						link: "Read the Cloudflare guide",
 						href: "/self-hosting",
 					},
 					{
-						title: "Docker / systemd",
-						body: "Run Synch on your own hardware with Docker Compose or systemd, with no Cloudflare account required.",
-						link: "Read the Docker / systemd guide",
+						title: "Docker or systemd",
+						body: "Prefer your own hardware? Run it with Docker Compose or systemd. No Cloudflare account involved.",
+						link: "Read the Docker guide",
 						href: "/self-hosting-docker",
 					},
 				],
 			},
+			forkTitle: "Built on Synch",
+			forkBody:
+				"Syncali is a fork of Synch by hjinco, MIT licensed. The sync engine, the encryption design and the hard thinking are theirs. We changed what we needed for our own devices and kept it open so you can do the same.",
+			forkLink: "Synch on GitHub",
 		},
 		pricing: {
 			heading: "Simple, transparent pricing.",

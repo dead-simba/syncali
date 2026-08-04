@@ -9,8 +9,14 @@ interface Props {
 }
 
 const { locale } = Astro.props;
-const t = ui[locale].home;
-const repositoryUrl = "https://github.com/hjinco/synch";
+
+// Per-key fallback to English. Newly written copy gets translated over time;
+// until it does a visitor sees English rather than a missing string, and any
+// key a locale has already translated still wins.
+const t = { ...ui.en.home, ...ui[locale].home } as typeof ui.en.home;
+
+const forkUrl = "https://github.com/hjinco/synch";
+const repositoryUrl = "https://github.com/dead-simba/synch";
 const koDemoPlaybackId = "X02Xss3kvaRlmCjOmB00zCoKNnHZdPzqpTZqggJ301PMVk";
 const defaultDemoPlaybackId =
   "wLFfexVomR006ejrrI0202jexidCGpEXbzuf801AKMlPh024";
@@ -29,145 +35,226 @@ signupUrl.searchParams.set("lang", locale);
   <script is:inline src="https://cdn.jsdelivr.net/npm/@mux/mux-player" defer
   ></script>
 
-  <div class="max-w-2xl mx-auto px-6 w-full flex-1 flex flex-col">
+  <div class="mx-auto flex w-full max-w-3xl flex-1 flex-col px-6">
     <Header locale={locale} />
 
-    <main class="flex-1 flex flex-col justify-center py-24">
-      <div class="space-y-6">
-        <h1 class="text-2xl sm:text-3xl text-zinc-200 tracking-tight">
-          {t.heroTitle[0]}<br />{t.heroTitle[1]}
+    <main class="flex-1 py-20 sm:py-28">
+      <section class="flex flex-col gap-6">
+        <h1
+          class="text-2xl sm:text-3xl font-semibold tracking-tight text-ink text-balance"
+        >
+          {t.heroTitle[0]}<br /><span class="text-ink-muted"
+            >{t.heroTitle[1]}</span
+          >
         </h1>
 
-        <p class="max-w-md leading-relaxed text-zinc-500">
+        <p class="max-w-xl text-base leading-relaxed text-ink-secondary">
           {t.heroBody}
         </p>
 
-        <div class="flex items-center gap-4 pt-4 text-xs">
-          <a
-            href={signupUrl.toString()}
-            class="px-4 py-2 bg-zinc-800 text-zinc-200 hover:bg-zinc-700 rounded transition-colors"
-          >
+        <div class="flex flex-wrap items-center gap-3 pt-2">
+          <a href={signupUrl.toString()} class="btn btn-primary">
             {t.getStarted}
           </a>
           <a
             href={repositoryUrl}
             target="_blank"
             rel="noopener noreferrer"
-            class="px-4 py-2 bg-transparent text-zinc-400 border border-zinc-800 hover:border-zinc-700 hover:text-zinc-300 rounded transition-all"
+            class="btn btn-secondary"
           >
             {t.viewSource}
           </a>
         </div>
 
-        <div class="pt-8">
-          <mux-player
-            playback-id={demoPlaybackId}
-            title="Synch demo video"
-            metadata-video-id="synch-landing-demo"
-            metadata-video-title="Synch landing page demo"
-            autoplay="muted"
-            muted
-            loop
-            playsinline
-            class="aspect-video w-full rounded-md border overflow-hidden border-zinc-800/80 bg-zinc-950 shadow-2xl shadow-black/30"
-            style="--controls: none; --media-object-fit: cover;"></mux-player>
+        <p class="text-xs text-ink-muted">{t.heroNote}</p>
+      </section>
+
+      <section class="pt-12">
+        <mux-player
+          playback-id={demoPlaybackId}
+          title="Syncali demo"
+          metadata-video-id="syncali-landing-demo"
+          metadata-video-title="Syncali landing page demo"
+          autoplay="muted"
+          muted
+          loop
+          playsinline
+          class="panel aspect-video w-full overflow-hidden bg-surface-inset shadow-overlay"
+          style="--controls: none; --media-object-fit: cover;"></mux-player>
+        <p class="pt-3 text-xs text-ink-muted">{t.demoCaption}</p>
+      </section>
+
+      {/*
+        Feature showcase. Each slot renders a looping, muted clip. Drop a file at
+        the path named in the copy into apps/www/public/media/ and it appears.
+        Until then the card shows the expected filename, so an unfinished
+        showcase reads as pending rather than as a broken player.
+      */}
+      <section class="pt-24">
+        <div class="h-px w-8 bg-line"></div>
+        <h2 class="pt-5 text-xl font-semibold tracking-tight text-ink">
+          {t.showcaseTitle}
+        </h2>
+        <p class="pt-2 text-sm text-ink-muted">{t.showcaseBody}</p>
+
+        <div class="grid gap-6 pt-8 sm:grid-cols-2">
+          {
+            t.showcase.map((item) => (
+              <figure class="panel flex h-full flex-col overflow-hidden">
+                <div class="relative aspect-video bg-surface-inset">
+                  <video
+                    src={item.media}
+                    poster={item.poster}
+                    autoplay
+                    muted
+                    loop
+                    playsinline
+                    preload="metadata"
+                    aria-label={item.title}
+                    class="h-full w-full object-cover"
+                  />
+                  <div
+                    aria-hidden="true"
+                    data-media-placeholder
+                    class="pointer-events-none absolute inset-0 flex items-center justify-center font-mono text-2xs uppercase tracking-widest text-ink-faint"
+                  >
+                    {item.media.split("/").pop()}
+                  </div>
+                </div>
+                <figcaption class="flex flex-1 flex-col gap-2 p-5">
+                  <h3 class="text-sm font-medium text-ink">{item.title}</h3>
+                  <p class="text-sm leading-relaxed text-ink-muted">
+                    {item.body}
+                  </p>
+                </figcaption>
+              </figure>
+            ))
+          }
         </div>
-      </div>
+      </section>
 
-      <div class="grid sm:grid-cols-2 gap-12 mt-32">
-        {
-          t.features.map((feature) => (
-            <div class="space-y-3">
-              <div class="w-8 h-px bg-zinc-800" />
-              <h3 class="text-zinc-300 font-normal">{feature.title}</h3>
-              <p class="text-zinc-500 leading-relaxed">{feature.body}</p>
-            </div>
-          ))
-        }
-      </div>
-
-      <div class="mt-32 space-y-6">
-        <div class="w-8 h-px bg-zinc-800"></div>
-        <h2 class="text-xl text-zinc-300 font-normal">{t.installTitle}</h2>
-        <div class="space-y-6 text-zinc-500 leading-relaxed">
-          <p>{t.installIntro}</p>
-
-          <ol class="space-y-3 list-decimal list-inside marker:text-zinc-700">
-            {
-              t.installSteps.map((step) => (
-                <li>
-                  {step.length === 1 ? (
-                    <>{step[0]} </>
-                  ) : (
-                    <>
-                      {step[0] && <>{step[0]}</>}{" "}
-                      <span class="text-zinc-300">{step[1]}</span>
-                      {step[2]}
-                    </>
-                  )}
-                </li>
-              ))
-            }
-          </ol>
+      <section class="pt-24">
+        <div class="grid gap-10 sm:grid-cols-2">
+          {
+            t.features.map((feature) => (
+              <div class="flex flex-col gap-3">
+                <div class="h-px w-8 bg-line" />
+                <h3 class="text-sm font-medium text-ink">{feature.title}</h3>
+                <p class="text-sm leading-relaxed text-ink-muted">
+                  {feature.body}
+                </p>
+              </div>
+            ))
+          }
         </div>
-      </div>
+      </section>
 
-      <div class="mt-32 space-y-6">
-        <div class="w-8 h-px bg-zinc-800"></div>
-        <div class="max-w-2xl space-y-6">
-          <h2 class="text-xl text-zinc-300 font-normal">
-            {t.selfHosting.title}
-          </h2>
-          <div class="grid gap-4 sm:grid-cols-2">
-            {t.selfHosting.options.map((option) => (
+      <section class="pt-24">
+        <div class="h-px w-8 bg-line"></div>
+        <h2 class="pt-5 text-xl font-semibold tracking-tight text-ink">
+          {t.installTitle}
+        </h2>
+        <p class="pt-3 text-sm leading-relaxed text-ink-secondary">
+          {t.installIntro}
+        </p>
+        <ol
+          class="flex list-inside list-decimal flex-col gap-3 pt-5 text-sm leading-relaxed text-ink-muted marker:text-ink-faint"
+        >
+          {
+            t.installSteps.map((step) => (
+              <li>
+                {step.length === 1 ? (
+                  <>{step[0]} </>
+                ) : (
+                  <>
+                    {step[0] && <>{step[0]}</>}{" "}
+                    <span class="text-ink">{step[1]}</span>
+                    {step[2]}
+                  </>
+                )}
+              </li>
+            ))
+          }
+        </ol>
+      </section>
+
+      <section class="pt-24">
+        <div class="h-px w-8 bg-line"></div>
+        <h2 class="pt-5 text-xl font-semibold tracking-tight text-ink">
+          {t.selfHosting.title}
+        </h2>
+        <div class="grid gap-4 pt-6 sm:grid-cols-2">
+          {
+            t.selfHosting.options.map((option) => (
               <a
                 href={localizedPath(locale, option.href)}
-                class="group flex h-full flex-col rounded-md border border-zinc-800/50 bg-zinc-900/20 p-5 transition-all hover:border-zinc-700/50 hover:bg-zinc-800/50"
+                class="panel group flex h-full flex-col p-5 transition-colors hover:border-line-strong hover:bg-surface-raised"
               >
                 <div class="flex items-start justify-between gap-4">
-                  <h3 class="font-normal text-zinc-300 group-hover:text-zinc-200">
-                    {option.title}
-                  </h3>
+                  <h3 class="text-sm font-medium text-ink">{option.title}</h3>
                   <span
                     aria-hidden="true"
-                    class="text-zinc-600 transition-transform group-hover:translate-x-0.5 group-hover:text-zinc-400"
+                    class="text-ink-faint transition-transform group-hover:translate-x-0.5 group-hover:text-accent-hover"
                   >
                     ↗
                   </span>
                 </div>
-                <p class="mt-3 flex-1 text-sm leading-relaxed text-zinc-500">
+                <p class="flex-1 pt-3 text-sm leading-relaxed text-ink-muted">
                   {option.body}
                 </p>
-                <span class="mt-5 text-xs text-zinc-400 group-hover:text-zinc-300">
+                <span class="pt-5 text-xs text-ink-secondary group-hover:text-ink">
                   {option.link}
                 </span>
               </a>
-            ))}
-          </div>
+            ))
+          }
         </div>
-      </div>
+      </section>
+
+      {/*
+        Attribution. Required by the MIT licence and by docs/copy-style.md:
+        never imply we wrote the original, never imply Synch endorses this fork.
+      */}
+      <section class="pt-24">
+        <div class="h-px w-8 bg-line"></div>
+        <h2 class="pt-5 text-xl font-semibold tracking-tight text-ink">
+          {t.forkTitle}
+        </h2>
+        <p class="max-w-xl pt-3 text-sm leading-relaxed text-ink-muted">
+          {t.forkBody}
+        </p>
+        <a
+          href={forkUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          class="mt-4 inline-flex items-center gap-1.5 text-xs text-ink-secondary transition-colors hover:text-accent-hover"
+        >
+          {t.forkLink}
+          <span aria-hidden="true">↗</span>
+        </a>
+      </section>
 
       {
         t.featuredPosts.length > 0 && (
-          <div class="mt-32 space-y-6">
-            <div class="w-8 h-px bg-zinc-800" />
-            <h2 class="text-xl text-zinc-300 font-normal">{t.featuredTitle}</h2>
-            <div class="grid sm:grid-cols-2 gap-6 pt-2">
+          <section class="pt-24">
+            <div class="h-px w-8 bg-line" />
+            <h2 class="pt-5 text-xl font-semibold tracking-tight text-ink">
+              {t.featuredTitle}
+            </h2>
+            <div class="grid gap-4 pt-6 sm:grid-cols-2">
               {t.featuredPosts.map((post) => (
                 <a
                   href={localizedPath(locale, post.href)}
-                  class="group block p-6 rounded-md border border-zinc-800/50 bg-zinc-900/20 hover:bg-zinc-800/50 hover:border-zinc-700/50 transition-all"
+                  class="panel group block p-5 transition-colors hover:border-line-strong hover:bg-surface-raised"
                 >
-                  <h3 class="text-zinc-300 font-medium mb-3 group-hover:text-zinc-200">
-                    {post.title}
-                  </h3>
-                  <p class="text-sm text-zinc-500 leading-relaxed">
+                  <h3 class="text-sm font-medium text-ink">{post.title}</h3>
+                  <p class="pt-2 text-sm leading-relaxed text-ink-muted">
                     {post.body}
                   </p>
                 </a>
               ))}
             </div>
-          </div>
+          </section>
         )
       }
     </main>
@@ -175,3 +262,18 @@ signupUrl.searchParams.set("lang", locale);
     <Footer locale={locale} />
   </div>
 </Layout>
+
+<script is:inline>
+  // Drop the filename placeholder once a clip loads, and hide the player if the
+  // file is not there yet - an unfinished showcase should read as pending, not
+  // as a broken video element.
+  document.querySelectorAll("figure video").forEach((video) => {
+    const placeholder = video.parentElement?.querySelector(
+      "[data-media-placeholder]",
+    );
+    video.addEventListener("loadeddata", () => placeholder?.remove());
+    video.addEventListener("error", () => {
+      video.style.display = "none";
+    });
+  });
+</script>
