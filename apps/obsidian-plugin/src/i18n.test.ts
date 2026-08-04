@@ -3,7 +3,7 @@ import { resetObsidianMocks, setLanguage } from "obsidian";
 
 import { formatErrorNotice, getSynchLocale, t } from "./i18n";
 
-describe("Synch i18n", () => {
+describe("Syncali i18n", () => {
   beforeEach(() => {
     resetObsidianMocks();
   });
@@ -33,7 +33,7 @@ describe("Synch i18n", () => {
         "Auto sync failed",
       ),
     ).toBe(
-      "이 기기의 동기화 기록이 원격 vault와 일치하지 않아 동기화를 중지했습니다. 다시 동기화하려면 Synch 설정에서 원격 vault의 연결을 해제한 후 다시 연결하세요.",
+      "이 기기의 동기화 기록이 원격 vault와 일치하지 않아 동기화를 중지했습니다. 다시 동기화하려면 Syncali 설정에서 원격 vault의 연결을 해제한 후 다시 연결하세요.",
     );
   });
 
@@ -78,7 +78,7 @@ describe("Synch i18n", () => {
   });
 });
 
-describe("Synch error notices", () => {
+describe("Syncali error notices", () => {
   beforeEach(() => {
     resetObsidianMocks();
   });

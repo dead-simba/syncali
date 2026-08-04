@@ -17,7 +17,7 @@ describe("SynchRemoteVaultController", () => {
     vi.unstubAllGlobals();
   });
 
-  it("opens remote vault management in the current Synch web locale", () => {
+  it("opens remote vault management in the current Syncali web locale", () => {
     setLanguage("ko");
     const open = vi.fn();
     vi.stubGlobal("window", { open });

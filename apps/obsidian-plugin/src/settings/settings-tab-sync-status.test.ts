@@ -124,7 +124,7 @@ describe("SynchSettingTab sync status", () => {
     tab.display();
 
     expect(getSettingNames().slice(0, 5)).toEqual([
-      "Synch",
+      "Syncali",
       "Sync",
       "Authentication",
       "Subscription",

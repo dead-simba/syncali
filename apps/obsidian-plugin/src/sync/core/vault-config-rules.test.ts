@@ -43,7 +43,7 @@ describe("shouldSyncVaultConfigPath", () => {
     ).toBe(true);
   });
 
-  it("keeps device-local and Synch-owned config files excluded", () => {
+  it("keeps device-local and Syncali-owned config files excluded", () => {
     const rules = {
       ...DEFAULT_VAULT_CONFIG_SYNC_RULES,
       enabled: true,

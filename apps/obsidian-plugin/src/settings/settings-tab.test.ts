@@ -54,7 +54,7 @@ describe("SynchSettingTab", () => {
 
     const buttonTexts = getButtonComponents().map((button) => button.text);
     expect(getSettingNames().slice(0, 5)).toEqual([
-      "Synch",
+      "Syncali",
       "Account",
       "Authentication",
       "Server",
@@ -77,7 +77,7 @@ describe("SynchSettingTab", () => {
 
     tab.display();
 
-    expect(getSettingNames()).toEqual(["Synch", "Network connection required"]);
+    expect(getSettingNames()).toEqual(["Syncali", "Network connection required"]);
     expect(getSettingDescriptions()).toContain(
       "Connect to the internet to check sign-in.",
     );
@@ -99,14 +99,14 @@ describe("SynchSettingTab", () => {
     tab.display();
 
     expect(ensureCommunityPluginUpdateCheck).toHaveBeenCalledTimes(1);
-    expect(getSettingNames()[0]).toBe("Synch");
-    expect(getCreatedElementTexts()).toContain("Update Synch from Community plugins");
+    expect(getSettingNames()[0]).toBe("Syncali");
+    expect(getCreatedElementTexts()).toContain("Update Syncali from Community plugins");
     expect(getSettingDescriptions()).not.toContain(
       "Version 0.0.2 is available. Current version: 0.0.1.",
     );
     expect(getCreatedElements()).toContainEqual({
       tag: "span",
-      text: "Update Synch from Community plugins",
+      text: "Update Syncali from Community plugins",
       classes: ["synch-plugin-update-badge"],
       attributes: {},
     });
@@ -119,7 +119,7 @@ describe("SynchSettingTab", () => {
         state: "update_required",
         currentVersion: "0.0.1",
         minVersion: "1.2.0",
-        message: "Update Synch before syncing.",
+        message: "Update Syncali before syncing.",
       }),
       hasAuthenticatedSession: () => true,
       hasConnectedRemoteVault: () => true,
@@ -129,7 +129,7 @@ describe("SynchSettingTab", () => {
 
     expect(getCreatedElementTexts()).toContain("Update required");
     expect(getSettingNames()).toContain("Sync paused");
-    expect(getSettingDescriptions()).toContain("Update Synch before syncing.");
+    expect(getSettingDescriptions()).toContain("Update Syncali before syncing.");
     expect(getButtonComponents().map((button) => button.text)).not.toContain("Start sync");
   });
 
@@ -144,7 +144,7 @@ describe("SynchSettingTab", () => {
     tab.display();
 
     expect(getSettingNames()).not.toContain("Plugin update");
-    expect(getCreatedElementTexts()).not.toContain("Update Synch from Community plugins");
+    expect(getCreatedElementTexts()).not.toContain("Update Syncali from Community plugins");
 
     resetObsidianMocks();
     createSettingsTab({

@@ -139,7 +139,7 @@ export function formatFileSizeBlockedTooltip(file: SynchFileSizeBlockedFile): st
       ].join(" ");
     default:
       return [
-        "Synch cannot sync this file because its encrypted size exceeds the file size limit.",
+        "Syncali cannot sync this file because its encrypted size exceeds the file size limit.",
         `Encrypted: ${formatBytes(file.encryptedSizeBytes)}.`,
         `Limit: ${formatBytes(file.maxFileSizeBytes)}.`,
       ].join(" ");

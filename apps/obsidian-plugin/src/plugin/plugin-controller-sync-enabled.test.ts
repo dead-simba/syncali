@@ -90,7 +90,7 @@ describe("SynchPluginController sync enabled setting", () => {
           status: "update_required",
           minVersion: "1.2.0",
           apiMajor: 1,
-          message: "Update Synch before syncing.",
+          message: "Update Syncali before syncing.",
         },
       })),
     );
@@ -110,7 +110,7 @@ describe("SynchPluginController sync enabled setting", () => {
     expect(controller.getSyncState()).toBe("update_required");
     expect(controller.getSyncStatusLabel()).toBe("Plugin update required.");
     expect(getNotices()).toContainEqual({
-      message: "Update Synch from Community plugins",
+      message: "Update Syncali from Community plugins",
       timeout: 0,
     });
 
@@ -121,7 +121,7 @@ describe("SynchPluginController sync enabled setting", () => {
       state: "update_required",
       currentVersion: "0.0.1",
       minVersion: "1.2.0",
-      message: "Update Synch from Community plugins",
+      message: "Update Syncali from Community plugins",
     });
     expect(ensureAutoSyncState).not.toHaveBeenCalled();
     expect(stopAutoSyncAndMarkNotReady).toHaveBeenCalled();
@@ -129,7 +129,7 @@ describe("SynchPluginController sync enabled setting", () => {
     expect(refreshUi).toHaveBeenCalled();
     expect(
       getNotices().filter(
-        (notice) => notice.message === "Update Synch from Community plugins",
+        (notice) => notice.message === "Update Syncali from Community plugins",
       ),
     )
       .toHaveLength(2);
@@ -165,7 +165,7 @@ describe("SynchPluginController sync enabled setting", () => {
     await controller.initialize();
 
     const message =
-      "This Synch server is not compatible with this plugin version. Update the server or install a compatible Synch plugin version.";
+      "This Syncali server is not compatible with this plugin version. Update the server or install a compatible Syncali plugin version.";
     expect(controller.getSyncState()).toBe("update_required");
     expect(controller.getServerCompatibilityStatus()).toEqual({
       state: "incompatible",
@@ -214,7 +214,7 @@ describe("SynchPluginController sync enabled setting", () => {
     await controller.initialize();
 
     const message =
-      "This Synch server is not compatible with this plugin version. Update the server or install a compatible Synch plugin version.";
+      "This Syncali server is not compatible with this plugin version. Update the server or install a compatible Syncali plugin version.";
     expect(controller.getSyncState()).toBe("update_required");
     expect(controller.getServerCompatibilityStatus()).toEqual({
       state: "incompatible",

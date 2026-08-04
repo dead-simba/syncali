@@ -341,7 +341,7 @@ describe("SynchPluginController readiness reconciliation", () => {
     expect(resetLocalSyncState).toHaveBeenCalledTimes(1);
     expect(startSync).not.toHaveBeenCalled();
     expect(getNotices()).toContainEqual({
-      message: "Remote vault was removed. Synch disconnected this Obsidian vault.",
+      message: "Remote vault was removed. Syncali disconnected this Obsidian vault.",
       timeout: undefined,
     });
   });
@@ -419,7 +419,7 @@ describe("SynchPluginController readiness reconciliation", () => {
     expect(resetLocalSyncState).toHaveBeenCalledTimes(1);
     expect(getNotices()).toContainEqual({
       message:
-        "Remote vault access is no longer available. Synch disconnected this Obsidian vault.",
+        "Remote vault access is no longer available. Syncali disconnected this Obsidian vault.",
       timeout: undefined,
     });
   });

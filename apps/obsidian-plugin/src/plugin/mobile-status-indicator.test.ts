@@ -120,7 +120,7 @@ describe("SynchMobileStatusIndicator", () => {
     expect(item.classes).toContain("synch-status-attention-needed");
     expect(item.classes.has("synch-mobile-status-indicator-hidden")).toBe(false);
     expect(item.attributes.get("aria-label")).toBe(
-      "Synch needs attention. Open Synch settings",
+      "Syncali needs attention. Open Syncali settings",
     );
     expect(item.attributes.get("data-synch-sync-state")).toBe("attention_needed");
     expect(item.attributes.get("data-synch-storage-warning")).toBe("false");
@@ -145,7 +145,7 @@ describe("SynchMobileStatusIndicator", () => {
     expect(item.classes).toContain("synch-status-storage-warning");
     expect(item.classes.has("synch-mobile-status-indicator-hidden")).toBe(false);
     expect(item.attributes.get("aria-label")).toBe(
-      "Synch storage is almost full. Open Synch settings",
+      "Syncali storage is almost full. Open Syncali settings",
     );
     expect(item.attributes.get("data-synch-sync-state")).toBe("up_to_date");
     expect(item.attributes.get("data-synch-storage-warning")).toBe("true");
@@ -166,7 +166,7 @@ describe("SynchMobileStatusIndicator", () => {
     expect(item.classes).toContain("synch-status-update-required");
     expect(item.classes.has("synch-mobile-status-indicator-hidden")).toBe(false);
     expect(item.attributes.get("aria-label")).toBe(
-      "Synch plugin update required. Open Synch settings",
+      "Syncali plugin update required. Open Syncali settings",
     );
     expect(item.attributes.get("data-synch-sync-state")).toBe("update_required");
     expect(item.children[0].attributes.get("data-icon")).toBe("triangle-alert");
@@ -189,7 +189,7 @@ describe("SynchMobileStatusIndicator", () => {
     expect(item.attributes.get("data-synch-sync-percent")).toBe("100");
   });
 
-  it("opens Synch settings when clicked", () => {
+  it("opens Syncali settings when clicked", () => {
     const plugin = createPlugin();
     const rootEl = new FakeElement();
     const indicator = new SynchMobileStatusIndicator(

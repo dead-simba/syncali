@@ -226,7 +226,7 @@ export class SyncAutoLoop {
         if (cursor > session.serverCursor) {
           throw new SyncRealtimeError(
             "cursor_ahead_of_server",
-            "Sync was paused because this device's sync history no longer matches the remote vault. To resume syncing, disconnect and reconnect the remote vault in Synch settings.",
+            "Sync was paused because this device's sync history no longer matches the remote vault. To resume syncing, disconnect and reconnect the remote vault in Syncali settings.",
           );
         }
         this.reconnectAttempt = 0;

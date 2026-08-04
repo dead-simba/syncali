@@ -43,7 +43,7 @@ export function renderSettingsHeading(
 ): void {
   const serverCompatibility = controller.getServerCompatibilityStatus();
   const communityUpdate = controller.getCommunityPluginUpdateStatus();
-  const heading = new Setting(containerEl).setName("Synch").setHeading();
+  const heading = new Setting(containerEl).setName("Syncali").setHeading();
   if (
     serverCompatibility.state === "update_required" ||
     serverCompatibility.state === "incompatible"

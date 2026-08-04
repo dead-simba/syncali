@@ -7,7 +7,7 @@ import {
   formatFileSizeBlockedTooltip,
 } from "./file-size-blocked-decorator";
 
-describe("Synch file-size blocked decorator", () => {
+describe("Syncali file-size blocked decorator", () => {
   it("adds an icon and tooltip to matching file explorer rows", () => {
     const root = createFileExplorerRoot(["large.md", "normal.md"]);
 
@@ -33,7 +33,7 @@ describe("Synch file-size blocked decorator", () => {
     expect(icon?.classList.contains("synch-file-size-blocked-icon")).toBe(true);
     expect(icon?.attributes.get("data-icon")).toBe("triangle-alert");
     expect(icon?.attributes.get("data-tooltip")).toBe(
-      "Synch cannot sync this file because its encrypted size exceeds the file size limit. Encrypted: 12.4 MB. Limit: 10 MB.",
+      "Syncali cannot sync this file because its encrypted size exceeds the file size limit. Encrypted: 12.4 MB. Limit: 10 MB.",
     );
   });
 

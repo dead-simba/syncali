@@ -131,7 +131,7 @@ function expectElementState(
   expect(item.classes).toContain("synch-status-bar");
   expect(item.classes).toContain(getStatusBarStateClass(syncState));
   expect(item.attributes.has("title")).toBe(false);
-  expect(item.attributes.get("aria-label")).toBe("Open Synch settings");
+  expect(item.attributes.get("aria-label")).toBe("Open Syncali settings");
   expect(item.attributes.get("data-synch-sync-state")).toBe(syncState);
   expect(item.attributes.get("data-synch-sync-percent")).toBe(String(percent));
   expect(item.attributes.get("data-synch-storage-warning")).toBe("false");
@@ -139,7 +139,7 @@ function expectElementState(
 }
 
 describe("SynchStatusBar", () => {
-  it("creates a custom Synch status bar item", () => {
+  it("creates a custom Syncali status bar item", () => {
     const plugin = createPlugin();
     const statusBar = new SynchStatusBar(plugin, createState("syncing", 37));
 
@@ -166,7 +166,7 @@ describe("SynchStatusBar", () => {
     expectElementState(plugin.addedStatusBarItems[0], "offline", 0);
   });
 
-  it("opens the Synch settings tab when clicked", () => {
+  it("opens the Syncali settings tab when clicked", () => {
     const plugin = createPlugin();
     const statusBar = new SynchStatusBar(plugin, createState("up_to_date", 100));
 
@@ -216,7 +216,7 @@ describe("SynchStatusBar", () => {
     expect(item.classes).toContain("synch-status-storage-warning");
     expect(item.classes.has("synch-status-active")).toBe(false);
     expect(item.attributes.get("aria-label")).toBe(
-      "Synch storage is almost full. Open Synch settings",
+      "Syncali storage is almost full. Open Syncali settings",
     );
     expect(item.attributes.get("data-synch-sync-state")).toBe("up_to_date");
     expect(item.attributes.get("data-synch-storage-warning")).toBe("true");
@@ -233,7 +233,7 @@ describe("SynchStatusBar", () => {
     expect(item.classes).toContain("synch-status-update-required");
     expect(item.classes.has("synch-status-active")).toBe(false);
     expect(item.attributes.get("aria-label")).toBe(
-      "Synch plugin update required. Open Synch settings",
+      "Syncali plugin update required. Open Syncali settings",
     );
     expect(item.attributes.get("data-synch-sync-state")).toBe("update_required");
     expect(item.children[0].attributes.get("data-icon")).toBe("triangle-alert");

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { buildBillingWebPageUrl } from "./web-url";
 
 describe("billing web URL helpers", () => {
-  it("maps Synch API hosts to the Synch website", () => {
+  it("maps Syncali API hosts to the Syncali website", () => {
     expect(buildBillingWebPageUrl("https://api.synch.run", "billing", "en")).toBe(
       "https://synch.run/billing",
     );

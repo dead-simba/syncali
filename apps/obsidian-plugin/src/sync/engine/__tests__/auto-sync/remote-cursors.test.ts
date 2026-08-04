@@ -91,7 +91,7 @@ describe("SyncAutoLoop remote cursors", () => {
     expect(onError.mock.calls[0]?.[0]).toMatchObject({
       code: "cursor_ahead_of_server",
       message:
-        "Sync was paused because this device's sync history no longer matches the remote vault. To resume syncing, disconnect and reconnect the remote vault in Synch settings.",
+        "Sync was paused because this device's sync history no longer matches the remote vault. To resume syncing, disconnect and reconnect the remote vault in Syncali settings.",
     });
     autoLoop.stop();
     await store.close();
@@ -104,7 +104,7 @@ describe("SyncAutoLoop remote cursors", () => {
     await store.setCursor(10);
     const cursorError = new SyncRealtimeError(
       "cursor_ahead_of_server",
-      "Sync was paused because this device's sync history no longer matches the remote vault. To resume syncing, disconnect and reconnect the remote vault in Synch settings.",
+      "Sync was paused because this device's sync history no longer matches the remote vault. To resume syncing, disconnect and reconnect the remote vault in Syncali settings.",
     );
     const openSession = vi.fn(async (
       _apiBaseUrl: string,
@@ -144,7 +144,7 @@ describe("SyncAutoLoop remote cursors", () => {
     await store.setCursor(10);
     const cursorError = new SyncRealtimeError(
       "cursor_ahead_of_server",
-      "Sync was paused because this device's sync history no longer matches the remote vault. To resume syncing, disconnect and reconnect the remote vault in Synch settings.",
+      "Sync was paused because this device's sync history no longer matches the remote vault. To resume syncing, disconnect and reconnect the remote vault in Syncali settings.",
     );
     const pullOnce = vi.fn(async () => {
       throw cursorError;
