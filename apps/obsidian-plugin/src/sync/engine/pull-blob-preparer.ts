@@ -1,3 +1,4 @@
+import { isOfflineLikeError } from "../../http/network-status";
 import { hashBytes } from "../core/content";
 import { decryptSyncBlob } from "../core/crypto";
 import type { SyncTokenResponse } from "../remote/client";
@@ -18,7 +19,13 @@ interface PullBlobPreparerDeps {
   getRemoteVaultKey: () => Uint8Array;
   pullClient: Pick<SyncPullClient, "downloadBlob">;
   prepareConcurrency?: number;
+  blobDownloadAttempts?: number;
+  blobRetryDelayMs?: number;
+  sleep?: (ms: number) => Promise<void>;
 }
+
+const DEFAULT_BLOB_DOWNLOAD_ATTEMPTS = 3;
+const DEFAULT_BLOB_RETRY_DELAY_MS = 500;
 
 export class PullBlobPreparer {
   constructor(private readonly deps: PullBlobPreparerDeps) {}
@@ -50,7 +57,7 @@ export class PullBlobPreparer {
       async (plan) => {
         return {
           plan,
-          bytes: await this.downloadAndVerifyEntryBlob(store, token, plan),
+          bytes: await this.downloadAndVerifyEntryBlobWithRetry(store, token, plan),
         };
       },
     );
@@ -70,6 +77,55 @@ export class PullBlobPreparer {
       token.vaultId,
       state.blobId,
     );
+  }
+
+  /**
+   * Retries a blob download that failed for transport reasons.
+   *
+   * A window is prepared in full before anything is written, so a single failed
+   * download discards the whole window - every other entry in it is re-fetched
+   * from scratch on the next attempt, and the sync cursor never advances. On a
+   * high-latency mobile link that is fatal rather than merely wasteful: with
+   * hundreds of entries per window, the odds that all of their downloads
+   * succeed on the same attempt approach zero, so the pull can never converge
+   * and the user sits at "99%" forever.
+   *
+   * Android's HTTP stack makes this routine. It reuses pooled keep-alive
+   * connections the server has already closed and reads an immediate EOF,
+   * reported as `IOException: unexpected end of stream` - which a retry on a
+   * fresh connection resolves outright.
+   *
+   * Only transport failures are retried. A hash mismatch means the bytes are
+   * wrong, not late, and must still fail the window immediately.
+   */
+  private async downloadAndVerifyEntryBlobWithRetry(
+    store: SyncBlobStore,
+    token: SyncTokenResponse,
+    plan: PlannedEntryState,
+  ): Promise<Uint8Array> {
+    const attempts = Math.max(1, this.deps.blobDownloadAttempts ?? DEFAULT_BLOB_DOWNLOAD_ATTEMPTS);
+    const delayMs = this.deps.blobRetryDelayMs ?? DEFAULT_BLOB_RETRY_DELAY_MS;
+    const sleep =
+      this.deps.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+
+    let lastError: unknown;
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      try {
+        return await this.downloadAndVerifyEntryBlob(store, token, plan);
+      } catch (error) {
+        lastError = error;
+        // `isOfflineLikeError` consults navigator.onLine, which reports offline
+        // for the duration of a real outage - retrying then would burn the
+        // budget on attempts that cannot succeed. Only the error text matters.
+        if (!isOfflineLikeError(error, () => false) || attempt === attempts - 1) {
+          throw error;
+        }
+
+        await sleep(delayMs * 2 ** attempt);
+      }
+    }
+
+    throw lastError;
   }
 
   private async downloadAndVerifyEntryBlob(

@@ -24,6 +24,7 @@ const OFFLINE_ERROR_MARKERS = [
 
   "connection abort",
   "econnaborted",
+  "unexpected end of stream",
   "connection reset",
   "connection closed",
   "connection timed out",
