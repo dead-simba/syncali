@@ -11,7 +11,7 @@
 		"db:migrate:managed": "wrangler d1 migrations apply DB --remote --env managed",
 		"db:studio": "drizzle-kit studio",
 		"dev": "wrangler dev --env managed --var DEV_MODE:true",
-		"deploy": "wrangler deploy && pnpm run db:migrate:self-hosted",
+		"deploy": "pnpm run build:css && wrangler deploy && pnpm run db:migrate:self-hosted",
 		"deploy:self-hosted": "wrangler deploy && pnpm run db:migrate:self-hosted",
 		"deploy:managed": "wrangler deploy --env managed",
 		"e2e:smoke": "node ./scripts/e2e-smoke.mjs",
@@ -21,7 +21,8 @@
 		"test:smoke": "node ./scripts/e2e-smoke.mjs",
 		"cf-typegen": "wrangler types",
 		"typecheck": "pnpm run cf-typegen && tsgo --noEmit",
-		"start": "tsx src/self-host.ts"
+		"start": "tsx src/self-host.ts",
+		"build:css": "tailwindcss -i ./src/styles/auth.css -o ./public/assets/auth.css --minify"
 	},
 	"cloudflare": {
 		"bindings": {
@@ -45,7 +46,9 @@
 		"dotenv": "^17.4.2",
 		"drizzle-kit": "^0.31.10",
 		"vitest": "^4.1.4",
-		"wrangler": "^4.82.2"
+		"wrangler": "^4.82.2",
+		"@tailwindcss/cli": "^4.3.3",
+		"tailwindcss": "^4.3.3"
 	},
 	"dependencies": {
 		"@better-auth/drizzle-adapter": "^1.6.2",
@@ -62,6 +65,7 @@
 		"jose": "^6.2.2",
 		"tsx": "^4.21.0",
 		"ws": "^8.20.0",
-		"zod": "^4.3.6"
+		"zod": "^4.3.6",
+		"@syncali/design": "workspace:*"
 	}
 }

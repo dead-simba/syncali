@@ -1,0 +1,179 @@
+/**
+ * Syncali component primitives.
+ *
+ * Deliberately small. These exist so a button, field or panel is defined once
+ * and reused, rather than every screen re-deriving the same stack of utility
+ * classes - which is how the auth pages and the marketing site drifted apart in
+ * the first place.
+ *
+ * Anything used on exactly one screen belongs on that screen, not here.
+ */
+
+@layer components {
+  /* ---- Buttons --------------------------------------------------------- */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.875rem;
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    line-height: 1.25rem;
+    white-space: nowrap;
+    cursor: pointer;
+    transition:
+      background-color 120ms ease,
+      border-color 120ms ease,
+      color 120ms ease,
+      opacity 120ms ease;
+  }
+
+  .btn:disabled,
+  .btn[aria-disabled="true"] {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .btn-primary {
+    background-color: var(--color-accent);
+    color: #fff;
+    border: 1px solid transparent;
+  }
+  .btn-primary:hover:not(:disabled) {
+    background-color: var(--color-accent-hover);
+  }
+  .btn-primary:active:not(:disabled) {
+    background-color: var(--color-accent-pressed);
+  }
+
+  .btn-secondary {
+    background-color: var(--color-surface-raised);
+    color: var(--color-ink);
+    border: 1px solid var(--color-line);
+  }
+  .btn-secondary:hover:not(:disabled) {
+    background-color: var(--color-surface-overlay);
+    border-color: var(--color-line-strong);
+  }
+
+  .btn-ghost {
+    background-color: transparent;
+    color: var(--color-ink-secondary);
+    border: 1px solid transparent;
+  }
+  .btn-ghost:hover:not(:disabled) {
+    background-color: var(--color-surface-raised);
+    color: var(--color-ink);
+  }
+
+  .btn-block {
+    width: 100%;
+  }
+
+  /* ---- Fields ---------------------------------------------------------- */
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+  }
+
+  .field-label {
+    font-size: var(--text-xs);
+    font-weight: 500;
+    color: var(--color-ink-secondary);
+  }
+
+  .field-input {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    background-color: var(--color-surface-inset);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-sm);
+    color: var(--color-ink);
+    font-size: var(--text-sm);
+    transition:
+      border-color 120ms ease,
+      background-color 120ms ease;
+  }
+  .field-input::placeholder {
+    color: var(--color-ink-faint);
+  }
+  .field-input:hover {
+    border-color: var(--color-line-strong);
+  }
+  .field-input:focus {
+    outline: none;
+    border-color: var(--color-accent);
+    background-color: var(--color-surface);
+  }
+  .field-input[aria-invalid="true"] {
+    border-color: var(--color-danger);
+  }
+
+  .field-hint {
+    font-size: var(--text-xs);
+    color: var(--color-ink-muted);
+  }
+
+  /* ---- Panels ---------------------------------------------------------- */
+  .panel {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-line-subtle);
+    border-radius: var(--radius-lg);
+  }
+
+  .panel-elevated {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-line-subtle);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-overlay);
+  }
+
+  /* ---- Inline messages -------------------------------------------------- */
+  .note {
+    display: flex;
+    gap: 0.625rem;
+    padding: 0.75rem 0.875rem;
+    border-radius: var(--radius-md);
+    font-size: var(--text-xs);
+    border: 1px solid transparent;
+  }
+  .note-info {
+    background-color: var(--color-accent-subtle);
+    border-color: var(--color-accent);
+    color: var(--color-accent-ink);
+  }
+  .note-success {
+    background-color: var(--color-success-subtle);
+    border-color: var(--color-success);
+    color: var(--color-success);
+  }
+  .note-danger {
+    background-color: var(--color-danger-subtle);
+    border-color: var(--color-danger);
+    color: var(--color-danger);
+  }
+
+  /* ---- Wordmark -------------------------------------------------------- */
+  .wordmark {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--color-ink);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .wordmark-mark {
+    width: 1.125rem;
+    height: 1.125rem;
+    border-radius: var(--radius-xs);
+    background: linear-gradient(
+      135deg,
+      var(--color-accent-hover),
+      var(--color-accent-pressed)
+    );
+  }
+}

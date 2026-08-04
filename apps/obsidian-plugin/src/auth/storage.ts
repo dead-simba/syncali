@@ -1,6 +1,6 @@
 import type { Plugin } from "obsidian";
 
-const SESSION_TOKEN_SECRET = "synchali-session-token";
+const SESSION_TOKEN_SECRET = "syncali-session-token";
 
 export async function readAuthSessionToken(plugin: Plugin): Promise<string> {
   return plugin.app.secretStorage.getSecret(SESSION_TOKEN_SECRET)?.trim() ?? "";

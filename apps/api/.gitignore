@@ -165,3 +165,6 @@ dist
 .env*
 !.env.example
 .wrangler/
+
+# compiled by `pnpm run build:css`
+public/assets/

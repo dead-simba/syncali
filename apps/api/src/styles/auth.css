@@ -1,0 +1,12 @@
+/* Stylesheet for the auth pages the Worker serves from ./public.
+ *
+ * Compiled by `pnpm run build:css` into public/assets/auth.css. These pages
+ * previously loaded cdn.tailwindcss.com on every request, which ships the whole
+ * framework unminified and compiles styles in the browser - the Tailwind team
+ * publish that CDN for prototyping only. Tokens are imported rather than
+ * redeclared so these pages cannot drift from the marketing site again. */
+@import "tailwindcss";
+@import "@syncali/design/tokens.css";
+@import "@syncali/design/components.css";
+
+@source "../../public/*.html";

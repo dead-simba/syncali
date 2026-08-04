@@ -2,7 +2,7 @@ import type { Plugin } from "obsidian";
 
 import { decodeBase64, encodeBase64 } from "../utils/bytes";
 
-const REMOTE_VAULT_KEY_SECRET = "synchali-remote-vault-key";
+const REMOTE_VAULT_KEY_SECRET = "syncali-remote-vault-key";
 
 export interface StoredRemoteVaultKeySecret {
   remoteVaultKey: Uint8Array;

@@ -54,16 +54,16 @@ describe("shouldSyncVaultConfigPath", () => {
     expect(shouldSyncVaultConfigPath(".obsidian/workspace.json", rules)).toBe(false);
     expect(shouldSyncVaultConfigPath(".obsidian/workspace-mobile.json", rules)).toBe(false);
     expect(
-      shouldSyncVaultConfigPath(".obsidian/plugins/synchali/manifest.json", rules),
+      shouldSyncVaultConfigPath(".obsidian/plugins/syncali/manifest.json", rules),
     ).toBe(false);
     expect(
-      shouldSyncVaultConfigPath(".obsidian/plugins/synchali/main.js", rules),
+      shouldSyncVaultConfigPath(".obsidian/plugins/syncali/main.js", rules),
     ).toBe(false);
     expect(
-      shouldSyncVaultConfigPath(".obsidian/plugins/synchali/styles.css", rules),
+      shouldSyncVaultConfigPath(".obsidian/plugins/syncali/styles.css", rules),
     ).toBe(false);
     expect(
-      shouldSyncVaultConfigPath(".obsidian/plugins/synchali/data.json", rules),
+      shouldSyncVaultConfigPath(".obsidian/plugins/syncali/data.json", rules),
     ).toBe(false);
   });
 

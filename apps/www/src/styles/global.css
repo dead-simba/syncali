@@ -1,1 +1,5 @@
+/* The marketing site and the auth pages the API worker serves share one token
+ * set, so a colour or type change lands on both instead of drifting. */
 @import "tailwindcss";
+@import "@syncali/design/tokens.css";
+@import "@syncali/design/components.css";

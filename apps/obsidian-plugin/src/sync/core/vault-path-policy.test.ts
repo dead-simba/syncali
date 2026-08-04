@@ -74,7 +74,7 @@ describe("decideVaultPathSync", () => {
     ).toBe(true);
     expect(
       isForbiddenVaultPath(
-        ".obsidian/plugins/synchali/data.json",
+        ".obsidian/plugins/syncali/data.json",
         DEFAULT_VAULT_CONFIG_SYNC_RULES,
       ),
     ).toBe(true);

@@ -1,0 +1,127 @@
+/**
+ * Syncali design tokens.
+ *
+ * The single source of truth for colour, type, spacing and elevation, shared by
+ * the marketing site and the auth pages the API worker serves. Both used to
+ * hardcode the same literals independently - the auth pages carried a comment
+ * reading "Mimic the selection colors from Layout.astro" - so they drifted
+ * every time either side changed.
+ *
+ * Tokens are semantic, not literal: consumers say `bg-surface-raised`, never
+ * `bg-zinc-900`. That is what makes a restyle a one-file change, and it is the
+ * discipline behind design systems like Sentry's Scraps - primitives and tokens
+ * composed, rather than one-off values written per screen.
+ */
+
+@theme {
+  /* ---- Surfaces: ascending elevation ---------------------------------- */
+  --color-canvas: #08080a;
+  --color-surface: #0e0e11;
+  --color-surface-raised: #16161a;
+  --color-surface-overlay: #1c1c21;
+  --color-surface-inset: #0b0b0e;
+
+  /* ---- Borders --------------------------------------------------------- */
+  --color-line-subtle: #1c1c21;
+  --color-line: #26262c;
+  --color-line-strong: #35353d;
+
+  /* ---- Text: descending emphasis --------------------------------------- */
+  --color-ink: #f4f4f5;
+  --color-ink-secondary: #a1a1aa;
+  --color-ink-muted: #71717a;
+  --color-ink-faint: #52525b;
+  --color-ink-inverse: #08080a;
+
+  /* ---- Accent ---------------------------------------------------------- */
+  --color-accent: #6366f1;
+  --color-accent-hover: #818cf8;
+  --color-accent-pressed: #4f46e5;
+  --color-accent-subtle: #1a1a2e;
+  --color-accent-ink: #c7d2fe;
+
+  /* ---- Status ---------------------------------------------------------- */
+  --color-success: #34d399;
+  --color-success-subtle: #0d2a20;
+  --color-warning: #fbbf24;
+  --color-warning-subtle: #2a2109;
+  --color-danger: #f87171;
+  --color-danger-subtle: #2b1315;
+
+  /* ---- Type scale ------------------------------------------------------ */
+  --font-sans:
+    ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1.125rem;
+  --text-sm: 0.8125rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base: 0.9375rem;
+  --text-base--line-height: 1.5rem;
+  --text-lg: 1.125rem;
+  --text-lg--line-height: 1.625rem;
+  --text-xl: 1.375rem;
+  --text-xl--line-height: 1.875rem;
+  --text-2xl: 1.75rem;
+  --text-2xl--line-height: 2.125rem;
+  --text-3xl: 2.25rem;
+  --text-3xl--line-height: 2.625rem;
+
+  /* ---- Radius ---------------------------------------------------------- */
+  --radius-xs: 0.25rem;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+
+  /* ---- Elevation ------------------------------------------------------- */
+  --shadow-raised: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-overlay:
+    0 16px 32px -12px rgb(0 0 0 / 0.7), 0 0 0 1px rgb(255 255 255 / 0.04);
+}
+
+/* -------------------------------------------------------------------------
+ * Base
+ * ---------------------------------------------------------------------- */
+
+::selection {
+  background-color: var(--color-accent-subtle);
+  color: var(--color-ink);
+}
+
+html {
+  color-scheme: dark;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background-color: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* A single visible focus treatment everywhere, rather than each control
+   inventing its own - keyboard users get one consistent signal. */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
