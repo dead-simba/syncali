@@ -139,7 +139,7 @@ const en = {
     "sync.cursorMismatch": "Sync was paused because this device's sync history no longer matches the remote vault. To resume syncing, disconnect and reconnect the remote vault in Syncali settings.",
     "sync.conflictLocalSaved": ({ path }: { path: string }) => `Sync conflict detected. Your local changes were saved to "${path}".`,
     "sync.conflictRemoteKept": ({ path }: { path: string }) => `Sync conflict detected for "${path}". The remote version will be kept.`,
-    "sync.fileSizeBlocked": ({ count }: { count: number }) => `${count} ${count === 1 ? "file exceeds" : "files exceed"} the sync size limit.`,
+    "sync.fileSizeBlocked": ({ count }: { count: number }) => `${count} ${count === 1 ? "file is" : "files are"} not syncing.`,
     "sync.label": "Sync",
     "sync.pathCollision": ({ path }: { path: string }) => `Sync path collision detected. The remote file was saved to "${path}".`,
     "sync.rollbackDetected": ({ path }: { path: string }) => `Sync server sent an outdated version of "${path}". It was ignored to avoid overwriting newer changes.`,

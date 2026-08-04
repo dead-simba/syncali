@@ -558,7 +558,13 @@ export class SyncEngine {
       return [];
     }
 
-    const mutations = await store.listBlockedDirtyEntriesByReason("file_too_large");
+    // Every blocked reason, not just size. A file parked because preparing it
+    // failed is exactly as invisible to the user as an oversized one, and
+    // strictly more surprising - they never chose to have a file that big.
+    const mutations = [
+      ...(await store.listBlockedDirtyEntriesByReason("file_too_large")),
+      ...(await store.listBlockedDirtyEntriesByReason("prepare_failed")),
+    ];
     const remoteVaultKey = this.deps.getRemoteVaultKey();
     const files: SyncFileSizeBlockedFile[] = [];
     for (const mutation of mutations) {
@@ -573,6 +579,7 @@ export class SyncEngine {
       );
       files.push({
         path: metadata.path,
+        reason: mutation.blockedReason ?? "file_too_large",
         encryptedSizeBytes: mutation.blockedEncryptedSizeBytes ?? null,
         maxFileSizeBytes: mutation.blockedMaxFileSizeBytes ?? null,
       });
@@ -725,6 +732,12 @@ export class SyncEngine {
 export type SyncEngineEntryVersionsPage = SyncEntryVersionsPage;
 
 export interface SyncFileSizeBlockedFile {
+  /**
+   * Why this file is not syncing. `file_too_large` is a limit the user can act
+   * on; `prepare_failed` means the change could not be prepared and would fail
+   * again, so it is parked rather than retried forever.
+   */
+  reason?: "file_too_large" | "prepare_failed";
   path: string;
   encryptedSizeBytes: number | null;
   maxFileSizeBytes: number | null;

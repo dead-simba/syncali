@@ -68,6 +68,9 @@ describe("SyncEngine", () => {
     await expect(engine.listFileSizeBlockedFiles()).resolves.toEqual([
       {
         path: "Folder/large.md",
+        // Carried so the UI can say why a file is not syncing: a size limit is
+        // something the user can act on, a preparation failure is not.
+        reason: "file_too_large",
         encryptedSizeBytes: 12_400_000,
         maxFileSizeBytes: 10_000_000,
       },

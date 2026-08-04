@@ -285,7 +285,7 @@ describe("SynchSettingTab sync status", () => {
         attributes: expect.objectContaining({
           "aria-hidden": "true",
           "data-icon": "triangle-alert",
-          "data-tooltip": "2 files exceed the sync size limit.",
+          "data-tooltip": "2 files are not syncing.",
           "data-tooltip-delay": "1",
           "data-tooltip-placement": "right",
         }),
@@ -324,7 +324,7 @@ describe("SynchSettingTab sync status", () => {
     expect(getFileSizeWarningElements()).toEqual([
       expect.objectContaining({
         attributes: expect.objectContaining({
-          "data-tooltip": "1 file exceeds the sync size limit.",
+          "data-tooltip": "1 file is not syncing.",
         }),
       }),
     ]);

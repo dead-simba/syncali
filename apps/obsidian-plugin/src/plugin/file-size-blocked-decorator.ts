@@ -139,7 +139,9 @@ export function formatFileSizeBlockedTooltip(file: SynchFileSizeBlockedFile): st
       ].join(" ");
     default:
       return [
-        "Syncali cannot sync this file because its encrypted size exceeds the file size limit.",
+        file.reason === "prepare_failed"
+          ? "Syncali could not prepare this file for upload, so it has been set aside and the rest of your vault kept syncing. Editing or renaming it will make Syncali try again."
+          : "Syncali cannot sync this file because its encrypted size exceeds the file size limit.",
         `Encrypted: ${formatBytes(file.encryptedSizeBytes)}.`,
         `Limit: ${formatBytes(file.maxFileSizeBytes)}.`,
       ].join(" ");
