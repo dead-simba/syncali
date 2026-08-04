@@ -143,8 +143,14 @@ export class PullBlobPreparer {
     );
     const actualHash = await hashBytes(bytes);
     if (actualHash !== plan.hash) {
+      // Lead with the path: an entry id is unactionable to the person reading
+      // the notice, and this failure is not retried, so it is the last thing
+      // they will be told about this file.
       throw new Error(
-        `Entry state ${plan.state.entryId}@${plan.state.revision} hash does not match metadata.`,
+        `Sync download for "${plan.metadata.path ?? plan.finalPath ?? plan.state.entryId}" ` +
+          `did not match its expected contents ` +
+          `(entry ${plan.state.entryId}@${plan.state.revision}). ` +
+          `Re-save the file on the device that last edited it.`,
       );
     }
     if (plan.finalPath && isAutoMergeTextPath(plan.finalPath)) {

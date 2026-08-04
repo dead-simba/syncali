@@ -80,7 +80,7 @@ describe("blob download retry", () => {
     (plan as { hash: string }).hash = "different-hash";
 
     await expect(preparer.preparePathBatchBlobs(store, token, [plan])).rejects.toThrow(
-      /hash does not match/,
+      /did not match its expected contents/,
     );
     expect(calls).toBe(1);
   });
