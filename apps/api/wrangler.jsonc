@@ -61,6 +61,18 @@
 		"SYNC_TOKEN_TTL_SECONDS": 120,
 		"SELF_HOSTED": true
 	},
+	// Pulling a large attachment streams an R2 body through the Worker, and a
+	// vault restore replays the whole entry manifest - both run long enough that
+	// the default CPU ceiling is the wrong one. Declared here so a CLI deploy
+	// does not silently revert a limit set through the dashboard.
+	"limits": {
+		"cpu_ms": 300000
+	},
+	// Without this a deploy turns dashboard logging off, which is exactly what
+	// you need when a client is failing against a self-hosted server.
+	"observability": {
+		"enabled": true
+	},
 	"secrets": {
 		"required": [
 			"AUTH_ALLOWED_EMAILS",
