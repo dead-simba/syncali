@@ -77,3 +77,52 @@ describe("Synch i18n", () => {
     expect(t("sync.label")).toBe("同步");
   });
 });
+
+describe("Synch error notices", () => {
+  beforeEach(() => {
+    resetObsidianMocks();
+  });
+
+  it("never renders a bare context when the error carries no message", () => {
+    // Android WebView exceptions and server frames missing `message` both reach
+    // here as `new Error(undefined)`, which used to render "Automatic sync
+    // failed:" with nothing after the colon.
+    expect(formatErrorNotice(new Error(undefined), "error.autoSync")).toBe(
+      "Automatic sync failed",
+    );
+  });
+
+  it("falls back to the error code when the message is empty", () => {
+    const error = Object.assign(new Error(""), { code: "blob_not_staged" });
+
+    expect(formatErrorNotice(error, "error.autoSync")).toBe(
+      "Automatic sync failed: blob_not_staged",
+    );
+  });
+
+  it("appends the code when it adds information the message lacks", () => {
+    const error = Object.assign(new Error("upload rejected"), {
+      code: "quota_exceeded",
+    });
+
+    expect(formatErrorNotice(error, "error.autoSync")).toBe(
+      "Automatic sync failed: upload rejected (quota_exceeded)",
+    );
+  });
+
+  it("does not repeat a code already present in the message", () => {
+    const error = Object.assign(new Error("quota_exceeded while pushing"), {
+      code: "quota_exceeded",
+    });
+
+    expect(formatErrorNotice(error, "error.autoSync")).toBe(
+      "Automatic sync failed: quota_exceeded while pushing",
+    );
+  });
+
+  it("does not surface useless [object Object] text", () => {
+    expect(formatErrorNotice({ nope: true }, "error.autoSync")).toBe(
+      "Automatic sync failed",
+    );
+  });
+});

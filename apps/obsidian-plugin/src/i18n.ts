@@ -1263,8 +1263,45 @@ export function formatErrorNotice(
     return t("sync.cursorMismatch");
   }
 
-  const message = error instanceof Error ? error.message : String(error);
+  const message = describeErrorForNotice(error);
+  if (!message) {
+    return t(contextKey);
+  }
+
   return t("error.detail", { context: t(contextKey), message });
+}
+
+// A notice reading "Automatic sync failed:" with nothing after the colon tells
+// the user nothing and is unreportable. Platform exceptions (Android WebView
+// DOMExceptions) and server frames whose `message` field is absent both produce
+// `new Error(undefined)`, whose `.message` is "" - so fall back through every
+// other identifying field before giving up.
+function describeErrorForNotice(error: unknown): string {
+  if (!(error instanceof Error)) {
+    const text = String(error ?? "").trim();
+    return text === "[object Object]" ? "" : text;
+  }
+
+  const message = error.message.trim();
+  const code =
+    "code" in error && typeof error.code === "string" ? error.code.trim() : "";
+
+  if (message && code && !message.includes(code)) {
+    return `${message} (${code})`;
+  }
+  if (message) {
+    return message;
+  }
+
+  if (code) {
+    return code;
+  }
+
+  // A subclass name ("VaultWriteError", "AbortError") identifies the failure;
+  // the base "Error" does not, so prefer showing the context alone over
+  // appending a word that means nothing to the reader.
+  const name = error.name.trim();
+  return name && name !== "Error" ? name : "";
 }
 
 export function formatVaultPasswordValidationError(
