@@ -1,10 +1,10 @@
 {
   "id": "syncali",
   "name": "Syncali",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "minAppVersion": "1.11.4",
-  "description": "Sync your vault across devices with end-to-end encryption.",
-  "author": "Synch",
-  "authorUrl": "https://github.com/hjinco",
+  "description": "End-to-end encrypted vault sync across your devices, on a server you control.",
+  "author": "dead-simba",
+  "authorUrl": "https://github.com/dead-simba/syncali",
   "isDesktopOnly": false
 }
