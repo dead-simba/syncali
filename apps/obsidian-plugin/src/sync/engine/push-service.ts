@@ -1,3 +1,4 @@
+import { isOfflineLikeError } from "../../http/network-status";
 import { SyncBlobClient } from "../remote/blob-client";
 import type { ConflictFileWriter } from "../core/conflict-file";
 import {
@@ -44,6 +45,16 @@ export interface SyncPushServiceDeps {
   onProgress: (progress: SyncProgressCounts) => Promise<void>;
   onConflict?: (event: PushConflictEvent) => void;
   onFileSizeBlockedFilesChange?: () => void;
+  /**
+   * Called when a mutation is parked because preparing it failed in a way that
+   * would fail again. Lets the surrounding runtime tell the user which file
+   * needs attention instead of leaving a silently smaller sync.
+   */
+  onMutationQuarantined?: (event: {
+    entryId: string;
+    mutationId: string;
+    error: unknown;
+  }) => void;
   now?: () => number;
 }
 
@@ -332,14 +343,68 @@ export class SyncPushService {
       this.deps.prepareConcurrency ?? DEFAULT_PUSH_PREPARE_CONCURRENCY,
       async (mutation) => ({
         mutation,
-        prepared: await mutationCommitter.prepareMutationForCommit(
+        prepared: await this.prepareOneOrQuarantine(
+          mutationCommitter,
           store,
           token,
+          session,
           mutation,
-          session.maxFileSizeBytes,
         ),
       }),
     );
+  }
+
+  /**
+   * Prepare one mutation, and never let it take the batch down with it.
+   *
+   * A push prepares every mutation in a batch before committing any of them, so
+   * a single throw used to abort the whole drain and stop sync outright. The
+   * causes are mundane and unavoidable in a real vault - a note renamed while
+   * the push was in flight, an attachment replaced mid-read, a file the OS will
+   * not hand over - but the blast radius was total, and the notice named none
+   * of them.
+   *
+   * Transient failures are rethrown so the existing retry and backoff still
+   * apply: a dropped connection must not quarantine a perfectly good file.
+   * Anything that would fail identically next attempt is parked with a reason,
+   * so the rest of the batch still goes through and the user can be told which
+   * file needs attention rather than watching sync stop.
+   */
+  private async prepareOneOrQuarantine(
+    mutationCommitter: PushMutationCommitter,
+    store: SyncPushStore,
+    token: SyncTokenResponse,
+    session: SyncRealtimeSession,
+    mutation: PendingMutationRow,
+  ): Promise<Awaited<ReturnType<PushMutationCommitter["prepareMutationForCommit"]>>> {
+    try {
+      return await mutationCommitter.prepareMutationForCommit(
+        store,
+        token,
+        mutation,
+        session.maxFileSizeBytes,
+      );
+    } catch (error) {
+      // navigator.onLine is deliberately ignored here: during a real outage it
+      // reports offline for everything, and quarantining a file because the
+      // wifi dropped would be exactly the wrong call. Only the error text
+      // decides whether this is worth retrying.
+      if (isOfflineLikeError(error, () => false)) {
+        throw error;
+      }
+
+      await store.updateDirtyEntry({
+        ...mutation,
+        status: "blocked",
+        blockedReason: "prepare_failed",
+      });
+      this.deps.onMutationQuarantined?.({
+        entryId: mutation.entryId,
+        mutationId: mutation.mutationId,
+        error,
+      });
+      return { skipped: true, reason: "prepare_failed" };
+    }
   }
 }
 

@@ -48,7 +48,26 @@ export class PushMutationPreparer {
       };
     }
 
-    const bytes = await this.deps.fileReader.readBytes(metadata.path);
+    // A queued upsert can outlive the file it points at: renaming, moving or
+    // deleting a note between the change being recorded and the push draining
+    // leaves the mutation pointing at a path that no longer exists. Reading it
+    // unguarded threw, and because a push prepares a whole batch before
+    // committing any of it, one moved file stopped the entire sync.
+    //
+    // The mutation is simply stale. Drop it and let the rename or delete event
+    // that superseded it carry the change instead - the same treatment the
+    // hash-changed case below already gets.
+    let bytes: Uint8Array;
+    try {
+      bytes = await this.deps.fileReader.readBytes(metadata.path);
+    } catch (error) {
+      if (!isMissingFileError(error)) {
+        throw error;
+      }
+
+      await store.clearDirtyEntryByMutationId(mutation.mutationId);
+      return null;
+    }
     if (!mutation.blobId) {
       throw new Error(`Upsert mutation ${mutation.mutationId} is missing a blobId.`);
     }
@@ -213,5 +232,26 @@ function isFileTooLargeUploadError(error: unknown): boolean {
     error instanceof SyncBlobUploadError &&
     error.status === 413 &&
     error.code !== "quota_exceeded"
+  );
+}
+
+/**
+ * Whether a read failed because the file is gone.
+ *
+ * Obsidian's desktop adapter surfaces node's ENOENT, while the mobile adapter
+ * reports a worded message from the platform layer, so both shapes are matched
+ * rather than relying on an error code being present.
+ */
+function isMissingFileError(error: unknown): boolean {
+  if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+    return true;
+  }
+
+  const message = (error instanceof Error ? error.message : String(error ?? "")).toLowerCase();
+  return (
+    message.includes("enoent") ||
+    message.includes("no such file") ||
+    message.includes("file does not exist") ||
+    message.includes("does not exist")
   );
 }

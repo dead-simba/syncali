@@ -66,7 +66,7 @@ export interface CachedSyncBlobRow {
 
 export type SyncBlobRole = "base" | "remote" | "local-cache";
 
-export type PendingMutationBlockedReason = "file_too_large";
+export type PendingMutationBlockedReason = "file_too_large" | "prepare_failed";
 
 export interface PendingMutationRow {
   mutationId: string;
