@@ -243,6 +243,7 @@ export class SyncEngine {
     getRemoteVaultKey: () => this.deps.getRemoteVaultKey(),
     shouldApplyRemotePath: (path) =>
       shouldApplyRemoteVaultPath(path, {
+        fileRules: this.deps.getSyncFileRules(),
         vaultConfigRules: this.deps.getVaultConfigSyncRules(),
       }),
     eventGate: this.syncEventGate,

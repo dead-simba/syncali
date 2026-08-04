@@ -44,9 +44,24 @@ export function decideVaultPathSync(
   return { kind: "ignore-local" };
 }
 
+/**
+ * Whether an incoming remote path may be written to this vault.
+ *
+ * File sync rules are per-device and describe what this device syncs, not what
+ * it uploads - the settings read "Sync video attachments on this device". They
+ * must therefore gate the pull as well as the push. Consulting only the vault
+ * config rules meant a device that had turned a file type off still downloaded
+ * and wrote every file of that type: the toggle appeared to do nothing, and on
+ * mobile a large attachment the user had explicitly excluded could still
+ * exhaust memory mid-pull.
+ *
+ * Entries rejected here are not dropped - `applySkippedRemoteStates` records
+ * their remote state, so the sync cursor still advances past them and they
+ * arrive if the rule is later turned back on.
+ */
 export function shouldApplyRemoteVaultPath(
   path: string,
-  rules: Pick<VaultPathPolicyRules, "vaultConfigRules">,
+  rules: VaultPathPolicyRules,
 ): boolean {
   const safetyClass = classifySyncPath(path, rules.vaultConfigRules.configDir);
   if (safetyClass === "reserved-never-sync") {
@@ -64,7 +79,7 @@ export function shouldApplyRemoteVaultPath(
     return shouldSyncVaultConfigPath(path, rules.vaultConfigRules);
   }
 
-  return true;
+  return shouldSyncPath(path, rules.fileRules);
 }
 
 export function isForbiddenVaultPath(
