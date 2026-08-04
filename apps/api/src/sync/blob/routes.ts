@@ -138,8 +138,8 @@ export function registerBlobRoutes(
 			const { vaultId, blobId } = c.req.valid("param");
 
 			await deps.syncTokenService.requireSyncToken(request, vaultId);
-			const body = await deps.blobRepository.download(blobObjectKey(vaultId, blobId));
-			if (!body) {
+			const blob = await deps.blobRepository.download(blobObjectKey(vaultId, blobId));
+			if (!blob) {
 				return c.json(
 					{
 						error: "not_found",
@@ -149,7 +149,16 @@ export function registerBlobRoutes(
 				);
 			}
 
-			return new Response(body);
+			// Declaring the length keeps the response out of chunked encoding, so a
+			// client that loses the connection mid-download sees a short read
+			// instead of a clean EOF. Without it a truncated large attachment is
+			// indistinguishable from a complete one.
+			return new Response(blob.body, {
+				headers: {
+					"content-type": "application/octet-stream",
+					"content-length": String(blob.size),
+				},
+			});
 		},
 	);
 }

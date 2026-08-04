@@ -1,6 +1,6 @@
 import { AwsClient } from "aws4fetch";
 
-import type { BlobBody, BlobStorage } from "./storage";
+import type { BlobBody, BlobDownload, BlobStorage } from "./storage";
 
 const LIST_BATCH_SIZE = 1000;
 
@@ -57,7 +57,7 @@ export class S3BlobStorage implements BlobStorage {
 		return { size: buffer.byteLength };
 	}
 
-	async download(key: string): Promise<ReadableStream | null> {
+	async download(key: string): Promise<BlobDownload | null> {
 		const response = await this.client.fetch(this.objectUrl(key));
 		if (response.status === 404) {
 			return null;
@@ -65,7 +65,23 @@ export class S3BlobStorage implements BlobStorage {
 		if (!response.ok) {
 			throw new Error(`s3 blob download failed for ${key}: ${response.status}`);
 		}
-		return response.body;
+		if (!response.body) {
+			throw new Error(`s3 blob download returned no body for ${key}`);
+		}
+
+		const contentLength = response.headers.get("content-length");
+		if (contentLength === null) {
+			throw new Error(`s3 blob download returned no content-length for ${key}`);
+		}
+
+		const declaredSize = Number(contentLength);
+		if (!Number.isSafeInteger(declaredSize) || declaredSize < 0) {
+			throw new Error(
+				`s3 blob download returned an invalid content-length for ${key}: ${contentLength}`,
+			);
+		}
+
+		return { body: response.body, size: declaredSize };
 	}
 
 	async delete(key: string): Promise<void> {

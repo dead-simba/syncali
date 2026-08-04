@@ -41,7 +41,10 @@ describe("blob routes: id validation", () => {
 
 	it("accepts a UUID-shaped blobId", async () => {
 		const { app, blobRepository } = buildApp();
-		blobRepository.download.mockResolvedValue(new Response("ciphertext").body);
+		blobRepository.download.mockResolvedValue({
+			body: new Response("ciphertext").body,
+			size: "ciphertext".length,
+		});
 
 		const response = await app.request(
 			"/v1/vaults/vault-1/blobs/550e8400-e29b-41d4-a716-446655440000",
@@ -51,5 +54,33 @@ describe("blob routes: id validation", () => {
 		expect(blobRepository.download).toHaveBeenCalledWith(
 			"vault-1/550e8400-e29b-41d4-a716-446655440000",
 		);
+	});
+
+	it("declares the blob length so a truncated download is detectable", async () => {
+		// Without content-length the response goes out chunked, and a client
+		// whose connection drops mid-body reads a clean EOF instead of a short
+		// read - which Android's OkHttp reports as
+		// "IOException: unexpected end of stream".
+		const { app, blobRepository } = buildApp();
+		blobRepository.download.mockResolvedValue({
+			body: new Response("ciphertext").body,
+			size: "ciphertext".length,
+		});
+
+		const response = await app.request("/v1/vaults/vault-1/blobs/blob-1");
+
+		expect(response.status).toBe(200);
+		expect(response.headers.get("content-length")).toBe(String("ciphertext".length));
+		expect(response.headers.get("content-type")).toBe("application/octet-stream");
+		expect(await response.text()).toBe("ciphertext");
+	});
+
+	it("still 404s a missing blob", async () => {
+		const { app, blobRepository } = buildApp();
+		blobRepository.download.mockResolvedValue(null);
+
+		const response = await app.request("/v1/vaults/vault-1/blobs/blob-1");
+
+		expect(response.status).toBe(404);
 	});
 });

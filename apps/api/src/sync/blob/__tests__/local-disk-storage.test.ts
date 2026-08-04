@@ -31,7 +31,10 @@ describe("LocalDiskBlobStorage", () => {
 
 		const downloaded = await storage.download("vault-1/blob-1");
 		expect(downloaded).not.toBeNull();
-		expect(await textOf(downloaded!)).toBe("hello world");
+		// The declared size is what lets the route send a content-length, so a
+		// truncated download is detectable instead of reading as a clean EOF.
+		expect(downloaded!.size).toBe("hello world".length);
+		expect(await textOf(downloaded!.body)).toBe("hello world");
 	});
 
 	it("returns null for a missing key and false for exists", async () => {

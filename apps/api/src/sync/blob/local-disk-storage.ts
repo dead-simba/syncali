@@ -4,7 +4,7 @@ import path from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 
-import type { BlobBody, BlobStorage } from "./storage";
+import type { BlobBody, BlobDownload, BlobStorage } from "./storage";
 
 /**
  * Filesystem-backed blob storage for a self-hosted, no-Cloudflare deployment.
@@ -30,17 +30,21 @@ export class LocalDiskBlobStorage implements BlobStorage {
 		return { size: stats.size };
 	}
 
-	async download(key: string): Promise<ReadableStream | null> {
+	async download(key: string): Promise<BlobDownload | null> {
 		const filePath = this.resolveKeyPath(key);
 		if (!(await pathExists(filePath))) {
 			return null;
 		}
+		const { size } = await stat(filePath);
 		// Node's `stream/web` ReadableStream and the ambient Workers-types
 		// `ReadableStream` this project's types are built on are structurally
 		// almost identical (they differ only in the BYOB reader's
 		// `readAtLeast`, which this codebase never calls) but are nominally
 		// distinct, hence the double cast.
-		return Readable.toWeb(createReadStream(filePath)) as unknown as ReadableStream;
+		return {
+			body: Readable.toWeb(createReadStream(filePath)) as unknown as ReadableStream,
+			size,
+		};
 	}
 
 	async delete(key: string): Promise<void> {

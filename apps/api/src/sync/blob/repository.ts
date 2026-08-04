@@ -1,4 +1,4 @@
-import type { BlobBody, BlobStorage } from "./storage";
+import type { BlobBody, BlobDownload, BlobStorage } from "./storage";
 
 export type { BlobBody };
 
@@ -16,9 +16,9 @@ export class BlobRepository implements BlobStorage {
 		return { size: object.size };
 	}
 
-	async download(key: string): Promise<ReadableStream | null> {
+	async download(key: string): Promise<BlobDownload | null> {
 		const object = await this.bucket.get(key);
-		return object?.body ?? null;
+		return object ? { body: object.body, size: object.size } : null;
 	}
 
 	async delete(key: string): Promise<void> {
