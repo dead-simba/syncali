@@ -186,10 +186,15 @@ export class SyncEngine {
         const unblocked = await this.syncPushService.unblockFileSizeBlockedMutations(
           session.maxFileSizeBytes,
         );
-        if (unblocked > 0) {
+        // A parked change is excluded from the pending queue, so left alone it
+        // waits for an edit the user does not know to make. A new session is a
+        // real change of circumstances - new network, possibly a restarted
+        // server - so it earns one more attempt.
+        const retried = await this.syncPushService.retryQuarantinedMutations();
+        if (unblocked + retried > 0) {
           this.deps.onFileSizeBlockedFilesChange?.();
         }
-        return unblocked;
+        return unblocked + retried;
       }),
     pullOnce: async (session) =>
       await this.withSyncActivity("pull", async () => {

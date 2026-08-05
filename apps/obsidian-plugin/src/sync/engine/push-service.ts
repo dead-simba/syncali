@@ -323,6 +323,38 @@ export class SyncPushService {
     };
   }
 
+  /**
+   * Give parked changes a fresh attempt when a new sync session starts.
+   *
+   * A parked mutation is excluded from the pending queue, so without this it
+   * waits until the user happens to edit that file again - which they will not
+   * do, because they do not know it is parked. That turns "set aside so the
+   * rest can sync" into "silently stops syncing", which is the one outcome a
+   * sync tool must not have.
+   *
+   * Reconnecting is a meaningful change in circumstances: a new session, often
+   * a new network, sometimes a restarted server. If the change fails five more
+   * times it is parked again, so this cannot spin - it is a fresh chance, not a
+   * retry loop.
+   */
+  async retryQuarantinedMutations(): Promise<number> {
+    const store = this.deps.getSyncStore();
+    if (!store) {
+      return 0;
+    }
+
+    const parked = await store.listBlockedDirtyEntriesByReason("prepare_failed");
+    for (const mutation of parked) {
+      this.commitFailures.delete(mutation.mutationId);
+      await store.updateDirtyEntry({
+        ...mutation,
+        status: "pending",
+        blockedReason: null,
+      });
+    }
+    return parked.length;
+  }
+
   async unblockFileSizeBlockedMutations(maxFileSizeBytes: number): Promise<number> {
     const store = this.deps.getSyncStore();
     if (!store) {
