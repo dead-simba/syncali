@@ -32,6 +32,14 @@ import {
 const DEFAULT_PUSH_BATCH = 100;
 const DEFAULT_PUSH_DRAIN_LIMIT = 1_000;
 const DEFAULT_PUSH_PREPARE_CONCURRENCY = 12;
+/**
+ * Consecutive commit rejections before a mutation is treated as stuck.
+ *
+ * High enough that a service blip, a failover or a brief outage is ridden out
+ * by the normal retry, low enough that a genuinely broken mutation stops
+ * blocking the queue within a minute or so rather than forever.
+ */
+const MAX_COMMIT_ATTEMPTS = 5;
 
 export interface SyncPushServiceDeps {
   getApiBaseUrl: () => string;
@@ -81,6 +89,13 @@ export interface PushPendingMutationsResult {
 }
 
 export class SyncPushService {
+  /**
+   * Consecutive commit failures per mutation. In memory on purpose: a restart
+   * genuinely is a fresh chance, and persisting it would keep punishing a file
+   * for an outage that has since ended.
+   */
+  private readonly commitFailures = new Map<string, number>();
+
   constructor(private readonly deps: SyncPushServiceDeps) {}
 
   async pushPendingMutations(
@@ -210,11 +225,48 @@ export class SyncPushService {
         });
 
         for (const { mutation, result: batchResult } of rejectedPushMutations) {
-          const result = await mutationCommitter.handleRejectedPreparedMutation(
-            store,
-            mutation,
-            batchResult,
-          );
+          // A rejection the committer cannot resolve throws, which aborts the
+          // drain so the whole batch retries. That is right for a transient
+          // rejection - "service unavailable" should be tried again, not
+          // treated as the file's fault.
+          //
+          // What was missing is an end to it. A mutation the server rejects
+          // identically every time re-uploaded its blob and was rejected again
+          // on every retry, forever, while everything queued behind it waited.
+          // Observed as the same blob uploaded seven times in a row, every
+          // upload accepted, no commit ever landing.
+          //
+          // So: keep retrying, but not indefinitely. After enough consecutive
+          // failures the mutation is treated as stuck rather than unlucky, and
+          // parked so the rest of the vault can move.
+          let result;
+          try {
+            result = await mutationCommitter.handleRejectedPreparedMutation(
+              store,
+              mutation,
+              batchResult,
+            );
+            this.commitFailures.delete(mutation.mutationId);
+          } catch (error) {
+            const attempts = (this.commitFailures.get(mutation.mutationId) ?? 0) + 1;
+            if (attempts < MAX_COMMIT_ATTEMPTS) {
+              this.commitFailures.set(mutation.mutationId, attempts);
+              throw error;
+            }
+
+            this.commitFailures.delete(mutation.mutationId);
+            await store.updateDirtyEntry({
+              ...mutation,
+              status: "blocked",
+              blockedReason: "prepare_failed",
+            });
+            this.deps.onMutationQuarantined?.({
+              entryId: mutation.entryId,
+              mutationId: mutation.mutationId,
+              error,
+            });
+            continue;
+          }
           conflictsCreated += result.conflictsCreated;
           shouldPullAfterPush = shouldPullAfterPush || result.shouldPullAfterPush;
 

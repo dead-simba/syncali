@@ -148,6 +148,12 @@ export class SyncEngine {
     onFileSizeBlockedFilesChange: () => {
       this.deps.onFileSizeBlockedFilesChange?.();
     },
+    onMutationQuarantined: (event) => {
+      // A parked file is the one failure the user cannot infer from anything
+      // else: sync carries on and reports success while that file quietly stops
+      // travelling. Name it, and say what makes it try again.
+      void this.describeQuarantinedMutation(event);
+    },
   });
   private readonly syncLocalReconcileService = new SyncLocalReconcileService({
     getSyncStore: () => this.syncStore,
@@ -550,6 +556,41 @@ export class SyncEngine {
       fileRules: this.deps.getSyncFileRules(),
       vaultConfigRules: this.deps.getVaultConfigSyncRules(),
     });
+  }
+
+  private async describeQuarantinedMutation(event: {
+    entryId: string;
+    mutationId: string;
+    error: unknown;
+  }): Promise<void> {
+    const store = this.syncStore;
+    let path = event.entryId;
+    if (store) {
+      try {
+        const mutation = await store.getDirtyEntryMutation(event.entryId);
+        if (mutation) {
+          const metadata = await decryptSyncMetadata(
+            this.deps.getRemoteVaultKey(),
+            mutation.encryptedMetadata,
+            metadataContextFromMutation(mutation),
+          );
+          path = metadata.path;
+        }
+      } catch {
+        // Falling back to the entry id is worse than a path but far better
+        // than staying silent about a file that has stopped syncing.
+      }
+    }
+
+    const reason = event.error instanceof Error ? event.error.message : String(event.error);
+    this.deps.notifyError(
+      new Error(
+        `"${path}" could not be synced and has been set aside so the rest of your vault keeps syncing. ` +
+          `Editing or renaming it will make Syncali try again. (${reason})`,
+      ),
+      "error.autoSync",
+    );
+    this.deps.onFileSizeBlockedFilesChange?.();
   }
 
   async listFileSizeBlockedFiles(): Promise<SyncFileSizeBlockedFile[]> {

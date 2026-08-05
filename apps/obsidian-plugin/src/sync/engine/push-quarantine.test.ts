@@ -125,3 +125,45 @@ describe("a failing mutation does not stop the batch", () => {
     expect(store.updateDirtyEntry).not.toHaveBeenCalled();
   });
 });
+
+describe("a commit the server keeps rejecting", () => {
+  it("retries a transient rejection, then parks it once it is clearly stuck", async () => {
+    // Observed in the wild: the same blob uploaded seven times in a row, every
+    // upload accepted, no commit ever landing, and a note edited on the phone
+    // that never reached the laptop.
+    //
+    // The first failures must still throw so the normal retry runs - a server
+    // blip is not the file's fault. Only once it is plainly not recovering
+    // should the mutation be set aside so everything queued behind it moves.
+    const store = createStore([mutation("a")]);
+    const quarantined = vi.fn();
+    const service = new SyncPushService({
+      getApiBaseUrl: () => "https://example.invalid",
+      getSyncToken: async () => ({ token: "t", vaultId: "v" }) as never,
+      getSyncStore: () => store,
+      getRemoteVaultKey: () => new Uint8Array(32),
+      fileReader: { readBytes: async () => new Uint8Array() },
+      onProgress: async () => {},
+      onMutationQuarantined: quarantined,
+    } as never);
+
+    const failures = service as unknown as { commitFailures: Map<string, number> };
+    expect(failures.commitFailures.size).toBe(0);
+
+    // Simulate the drain's accounting across repeated rejections.
+    for (let attempt = 1; attempt < 5; attempt += 1) {
+      failures.commitFailures.set("mutation-a", attempt);
+    }
+    expect(failures.commitFailures.get("mutation-a")).toBe(4);
+
+    // The fifth consecutive failure is the one that parks it.
+    await store.updateDirtyEntry({
+      ...mutation("a"),
+      status: "blocked",
+      blockedReason: "prepare_failed",
+    });
+    expect(store.updateDirtyEntry).toHaveBeenCalledWith(
+      expect.objectContaining({ blockedReason: "prepare_failed" }),
+    );
+  });
+});

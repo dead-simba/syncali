@@ -2,6 +2,5 @@
 
 ## Fixed
 
-- Renaming, moving or deleting a note while a sync was in flight could stop sync entirely with "File does not exist". The queued change is now recognised as stale and discarded, and the rename or delete that replaced it carries the change instead.
-- One unsyncable file no longer stops the others. A file that cannot be prepared for upload is set aside with a reason and the rest of the batch continues, instead of the whole sync halting. Connection problems are still retried rather than set aside, so a dropped connection never parks a file that was fine.
-- A file that is not syncing is now shown in the file explorer and counted in settings whatever the reason, not only when it is too large. Previously a file set aside for any other reason was invisible.
+- A change the server kept rejecting was uploaded and rejected again on every retry, indefinitely, while every other change queued behind it waited. Transient rejections are still retried as before, but a change that is plainly not recovering is now set aside so the rest of the vault keeps syncing.
+- When a file is set aside you are now told which file it is and what makes Syncali try again, instead of sync quietly continuing without it.
