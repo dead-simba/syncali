@@ -40,5 +40,7 @@ export function isNeverSyncReservedPath(path: string): boolean {
 }
 
 function normalizeReservedPath(path: string): string {
-  return path.trim().replace(/^\/+/, "").replace(/\/+$/, "");
+  // Not trimmed: a leading or trailing space is part of a real filename, and
+  // rewriting it here would classify a path that does not exist.
+  return path.replace(/^\/+/, "").replace(/\/+$/, "");
 }

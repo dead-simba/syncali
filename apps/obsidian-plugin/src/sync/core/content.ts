@@ -20,8 +20,12 @@ export function parseSyncedEntryMetadata(value: string): SyncedEntryMetadata {
   }
 
   const record = parsed as Record<string, unknown>;
-  const path = typeof record.path === "string" ? record.path.trim() : "";
-  if (!path) {
+  // Validate without rewriting. This path is the file's actual name, and a
+  // name is allowed to begin or end with a space - "V2.2 Ground Floor " is a
+  // real file on macOS and Linux. Trimming it here silently pointed every
+  // read and write at a path that does not exist.
+  const path = typeof record.path === "string" ? record.path : "";
+  if (!path.trim()) {
     throw new Error("Sync metadata is missing a file path.");
   }
   if (!Object.prototype.hasOwnProperty.call(record, "hash")) {
