@@ -110,7 +110,9 @@ describe("SyncController", () => {
     expect(setStorageStatusWatching).toHaveBeenCalledWith(false);
     expect(stopAutoSync).toHaveBeenCalledTimes(1);
     expect(controller.getSyncState()).toBe("paused");
-    expect(controller.getSyncStatusLabel()).toBe("Sync: paused 0%");
+    expect(controller.getSyncStatusLabel()).toBe(// A settled state carries no percentage: "paused 0%" invited the reading
+    // that nothing had synced, when it only meant nothing was running.
+    "paused");
   });
 
   it("watches storage status while auto sync starts for a connected vault", async () => {
