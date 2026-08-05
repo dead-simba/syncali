@@ -449,9 +449,17 @@ export class PullEntryStateApplier {
             }
 
             entriesApplied += batch.plans.length;
+            const completedEntries = (progress?.completedOffset ?? 0) + entriesApplied;
+            const reportedTotal = progress?.totalEntries ?? prepared.plans.length;
             await this.deps.onProgress?.({
-              completedEntries: (progress?.completedOffset ?? 0) + entriesApplied,
-              totalEntries: progress?.totalEntries ?? prepared.plans.length,
+              completedEntries,
+              // The total is counted once, when the pull starts. Anything
+              // another device commits while this pull is running is applied
+              // but was never in that count, so the numerator can overtake the
+              // denominator and the user sees "1449 / 1448", which reads as a
+              // bug in their sync rather than a stale denominator. Grow the
+              // total to match instead of reporting an impossible fraction.
+              totalEntries: Math.max(reportedTotal, completedEntries),
             });
           }
 

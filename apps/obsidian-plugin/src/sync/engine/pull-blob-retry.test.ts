@@ -85,3 +85,22 @@ describe("blob download retry", () => {
     expect(calls).toBe(1);
   });
 });
+
+describe("sync progress", () => {
+  it("never reports more done than there is to do", async () => {
+    // The total is counted once when a pull starts. If another device commits
+    // during that pull, the extra entries are applied but were never counted,
+    // and the display read "1449 / 1448" - which looks like a broken sync
+    // rather than a stale denominator.
+    const { getUserVisibleSyncPercent } = await import(
+      "../runtime/user-visible-status"
+    );
+
+    expect(
+      getUserVisibleSyncPercent({ completedEntries: 1449, totalEntries: 1449 }),
+    ).toBe(100);
+    expect(
+      getUserVisibleSyncPercent({ completedEntries: 700, totalEntries: 1448 }),
+    ).toBe(48);
+  });
+});

@@ -2,6 +2,4 @@
 
 ## Fixed
 
-- A change the server kept rejecting was uploaded and rejected again on every retry, indefinitely, while every other change queued behind it waited. Transient rejections are still retried as before, but a change that is plainly not recovering is now set aside so the rest of the vault keeps syncing.
-- A change that was set aside now gets a fresh attempt every time sync reconnects, instead of waiting for you to happen to edit that file again.
-- When a file is set aside you are told which file it is and what makes Syncali try again, instead of sync quietly continuing without it.
+- Sync progress could show more files done than there were to do, such as "1449 / 1448". The total is counted once when a sync starts, so anything another device saved while it was running was applied without being counted. The total now grows to match instead of reporting an impossible number.
