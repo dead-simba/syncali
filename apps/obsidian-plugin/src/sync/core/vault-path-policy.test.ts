@@ -180,3 +180,28 @@ describe("shouldApplyRemoteVaultPath", () => {
     ).toBe(false);
   });
 });
+
+describe("filenames with leading or trailing spaces", () => {
+  it("does not rewrite a path whose name ends in a space", () => {
+    // macOS and Linux allow it, and Obsidian will create one. Trimming the
+    // path rewrote it to a name that does not exist, so every read failed with
+    // ENOENT and stopped sync entirely.
+    const path = "My Knowledge Base/Utilities/Images/V2.2 Ground Floor ";
+    const rules = {
+      fileRules: { ...DEFAULT_SYNC_FILE_RULES, includeOtherFiles: true },
+      vaultConfigRules: DEFAULT_VAULT_CONFIG_SYNC_RULES,
+    };
+
+    expect(shouldApplyRemoteVaultPath(path, rules)).toBe(true);
+    expect(decideVaultPathSync(path, rules).kind).toBe("sync");
+  });
+
+  it("still excludes it when other file types are off", () => {
+    expect(
+      decideVaultPathSync("Images/V2.2 Ground Floor ", {
+        fileRules: DEFAULT_SYNC_FILE_RULES,
+        vaultConfigRules: DEFAULT_VAULT_CONFIG_SYNC_RULES,
+      }).kind,
+    ).toBe("ignore-local");
+  });
+});

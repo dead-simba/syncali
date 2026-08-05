@@ -125,7 +125,7 @@ export function normalizeExcludedFolders(value: unknown): string[] {
       continue;
     }
 
-    const normalized = normalizeVaultPath(entry);
+    const normalized = normalizeVaultPath(entry.trim());
     if (!normalized || hasHiddenSegment(normalized) || isReservedSyncPath(normalized)) {
       continue;
     }
@@ -148,7 +148,7 @@ export function normalizeIncludedHiddenFolders(value: unknown): string[] {
       continue;
     }
 
-    const normalized = normalizeVaultPath(entry);
+    const normalized = normalizeVaultPath(entry.trim());
     if (
       !normalized ||
       !hasHiddenSegment(normalized) ||
@@ -165,7 +165,14 @@ export function normalizeIncludedHiddenFolders(value: unknown): string[] {
 }
 
 export function normalizeVaultPath(path: string): string {
-  return path.trim().replace(/^\/+/, "").replace(/\/+$/, "");
+  // Deliberately not trimmed. macOS and Linux allow a filename to begin or end
+  // with a space, and Obsidian will happily create one - "V2.2 Ground Floor "
+  // is a real file. Trimming here rewrote the path to a name that does not
+  // exist, and every read of it failed with ENOENT, which stopped sync.
+  //
+  // Whitespace typed into a settings field is a different thing and is trimmed
+  // where that input is read, not here.
+  return path.replace(/^\/+/, "").replace(/\/+$/, "");
 }
 
 function pruneSubpaths(sortedPaths: readonly string[]): string[] {
