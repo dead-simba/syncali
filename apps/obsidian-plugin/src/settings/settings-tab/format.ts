@@ -13,8 +13,17 @@ export function shouldShowSyncSpinner(state: SynchSyncState): boolean {
 export function formatSyncDescription(
   statusLabel: string,
   syncProgress: SynchSyncProgress,
+  state?: SynchSyncState,
 ): string {
   const label = formatSyncStatusLabel(statusLabel);
+  // Counts describe work in flight. Once sync has settled they are last run's
+  // leftovers, and entries the planner skipped were never counted - so a
+  // finished pull genuinely ends below its total and "up to date - 1472 / 1474"
+  // reads as two files quietly missing.
+  if (state && !shouldShowSyncSpinner(state)) {
+    return label;
+  }
+
   return `${label} - ${syncProgress.completedEntries} / ${syncProgress.totalEntries}`;
 }
 

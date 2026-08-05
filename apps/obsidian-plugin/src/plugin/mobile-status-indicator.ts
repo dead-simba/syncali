@@ -12,11 +12,25 @@ const MOBILE_STATUS_INDICATOR_STATE_CLASSES = [
   "synch-status-attention-needed",
   "synch-status-update-required",
   "synch-status-storage-warning",
+  "synch-status-syncing",
+  "synch-status-up-to-date",
 ];
+
+/**
+ * How long the tick stays up after a sync finishes.
+ *
+ * On desktop the status bar is always visible, so it can sit on a checkmark
+ * indefinitely. A phone has no such place, and a permanent badge over the note
+ * you are writing is worse than no badge at all - so it confirms, briefly, and
+ * gets out of the way.
+ */
+const UP_TO_DATE_VISIBLE_MS = 2_000;
 
 export class SynchMobileStatusIndicator {
   private indicator: HTMLElement | null = null;
   private icon: HTMLElement | null = null;
+  private upToDateTimer: ReturnType<typeof setTimeout> | null = null;
+  private wasSyncing = false;
 
   constructor(
     private readonly plugin: Plugin,
@@ -47,6 +61,16 @@ export class SynchMobileStatusIndicator {
     this.refresh();
   }
 
+  private showUpToDateBriefly(): void {
+    if (this.upToDateTimer) {
+      clearTimeout(this.upToDateTimer);
+    }
+    this.upToDateTimer = setTimeout(() => {
+      this.upToDateTimer = null;
+      this.refresh();
+    }, UP_TO_DATE_VISIBLE_MS);
+  }
+
   refresh(): void {
     if (!this.indicator) {
       return;
@@ -54,8 +78,19 @@ export class SynchMobileStatusIndicator {
 
     const state = this.state.getSyncState();
     const hasStorageWarning = isStorageWarningStatus(this.state.getStorageStatus());
-    const shouldShow =
+    const isSyncing = state === "syncing" || state === "reconnecting";
+    const needsAttention =
       hasStorageWarning || state === "attention_needed" || state === "update_required";
+
+    // Confirm completion only when there was something to complete. Showing a
+    // tick on every idle refresh would train the user to ignore it.
+    const justFinished = this.wasSyncing && state === "up_to_date";
+    this.wasSyncing = isSyncing;
+    if (justFinished) {
+      this.showUpToDateBriefly();
+    }
+
+    const shouldShow = needsAttention || isSyncing || this.upToDateTimer !== null;
 
     for (const className of MOBILE_STATUS_INDICATOR_STATE_CLASSES) {
       this.indicator.removeClass(className);
@@ -65,6 +100,23 @@ export class SynchMobileStatusIndicator {
     this.indicator.toggleClass("synch-status-storage-warning", hasStorageWarning);
     if (!hasStorageWarning && (state === "attention_needed" || state === "update_required")) {
       this.indicator.addClass(getStatusBarStateClass(state));
+    } else if (!needsAttention && isSyncing) {
+      this.indicator.addClass("synch-status-syncing");
+    } else if (!needsAttention && this.upToDateTimer !== null) {
+      this.indicator.addClass("synch-status-up-to-date");
+    }
+
+    if (this.icon) {
+      setIcon(
+        this.icon,
+        hasStorageWarning
+          ? "triangle-alert"
+          : state === "attention_needed" || state === "update_required"
+            ? "triangle-alert"
+            : isSyncing
+              ? "loader-circle"
+              : "check",
+      );
     }
     this.indicator.setAttribute(
       "aria-label",
@@ -72,7 +124,11 @@ export class SynchMobileStatusIndicator {
         ? t("status.storageAlmostFull")
         : state === "update_required"
           ? t("status.pluginUpdateRequired")
-        : t("status.attention"),
+          : state === "attention_needed"
+            ? t("status.attention")
+            : isSyncing
+              ? t("sync.state.syncing")
+              : t("sync.state.up_to_date"),
     );
     this.indicator.setAttribute("data-synch-sync-state", state);
     this.indicator.setAttribute("data-synch-sync-percent", String(this.state.getSyncPercent()));

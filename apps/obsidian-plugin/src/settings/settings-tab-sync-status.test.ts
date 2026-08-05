@@ -279,7 +279,7 @@ describe("SynchSettingTab sync status", () => {
     tab.display();
     await nextTask();
 
-    expect(getSettingDescriptions()[0]).toBe("up to date 99% - 4000 / 4001");
+    expect(getSettingDescriptions()[0]).toBe("up to date 99%");
     expect(getFileSizeWarningElements()).toEqual([
       expect.objectContaining({
         attributes: expect.objectContaining({
@@ -360,7 +360,7 @@ describe("SynchSettingTab sync status", () => {
     tab.display();
 
     expect(getButtonComponents()[0]?.text).toBe("Start sync");
-    expect(getSettingDescriptions()[0]).toBe("paused - 12 / 12");
+    expect(getSettingDescriptions()[0]).toBe("paused");
     await getButtonComponents()[0]?.click();
     expect(setSyncEnabled).toHaveBeenCalledWith(true);
     expect(getExtraButtonComponents()).toEqual([]);
@@ -400,7 +400,7 @@ describe("SynchSettingTab sync status", () => {
 
     expect(getSettingNames().slice(1, 3)).toEqual(["Sync", "Storage"]);
     expect(getSettingDescriptions()[0]).toBe(
-      "synced 100% - 12 / 12",
+      "synced 100%",
     );
     expect(getSettingDescriptions()[1]).toBe("24.3 MB / 50 MB (49%)");
     expect(getProgressBarComponents().map(({ value }) => value)).toEqual([
@@ -496,7 +496,7 @@ describe("SynchSettingTab sync status", () => {
 
     expect(getSettingNames().slice(1, 3)).toEqual(["Sync", "Storage"]);
     expect(getSettingDescriptions()[0]).toBe(
-      "synced 100% - 12 / 12",
+      "synced 100%",
     );
     expect(getSettingDescriptions()[1]).toBe("24.3 MB");
     expect(getProgressBarComponents()[0]?.value).toBe(0);
@@ -518,7 +518,7 @@ describe("SynchSettingTab sync status", () => {
     tab.display();
 
     expect(getSettingNames().slice(1, 3)).toEqual(["Sync", "Storage"]);
-    expect(getSettingDescriptions()[0]).toBe("synced 100% - 12 / 12");
+    expect(getSettingDescriptions()[0]).toBe("synced 100%");
     expect(getSettingDescriptions()[1]).toBe("Checking storage usage...");
     expect(getProgressBarComponents().map(({ value }) => value)).toEqual([
       0,

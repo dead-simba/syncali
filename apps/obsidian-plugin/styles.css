@@ -503,3 +503,32 @@
   flex-wrap: wrap;
   gap: 0.5rem;
 }
+
+/* Mobile sync indicator states.
+ *
+ * A phone has no status bar to live in, so this badge floats over the note.
+ * It earns that space only while something is happening: it spins during a
+ * sync, confirms briefly when one finishes, then disappears. A permanent
+ * badge over what you are writing is worse than no badge at all. */
+.synch-mobile-status-indicator.synch-status-syncing {
+	color: var(--text-muted);
+}
+
+.synch-mobile-status-indicator.synch-status-syncing svg {
+	animation: synch-mobile-spin 1s linear infinite;
+}
+
+.synch-mobile-status-indicator.synch-status-up-to-date {
+	color: var(--text-success, var(--text-muted));
+}
+
+@keyframes synch-mobile-spin {
+	from { transform: rotate(0deg); }
+	to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.synch-mobile-status-indicator.synch-status-syncing svg {
+		animation: none;
+	}
+}

@@ -188,6 +188,7 @@ export function renderSyncStatusSetting(
     formatSyncDescription(
       controller.getSyncStatusLabel(),
       controller.getSyncProgress(),
+      controller.getSyncState(),
     );
   const initialSyncDescription = getSyncDescription();
   const syncSetting = new Setting(containerEl)
