@@ -75,8 +75,20 @@ measurement, and it never reaches a conclusion.
   there, which changed nothing, so the next revision collided too — a new copy
   every few seconds.
 
+A fix for one of these can create another. Making the scan stop skipping a
+file with nothing on the server behind it fixed files that silently never
+synced - and became a loop, because when the upload could not succeed the next
+scan met exactly the condition the failure had left behind. A phone uploaded
+the same content about fifty-six times a minute, roughly 160,000 requests a
+day against a 100,000 request limit.
+
 **Before adding a corrective action, ask what makes it stop.** If it does not
-change what triggered it, it will run forever.
+change what triggered it, it will run forever. Anything that retries needs a
+bound, and when the bound is reached the user has to be able to see what was
+set aside - `Files not syncing` is where that goes.
+
+**Watch the request rate after shipping a retry change.** `npx wrangler tail`
+for a minute: an idle vault is a handful of requests, not hundreds.
 
 ### The status disagreeing with reality
 
