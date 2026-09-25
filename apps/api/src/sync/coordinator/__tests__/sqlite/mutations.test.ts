@@ -154,7 +154,8 @@ describe("sqlite backend: mutation commits", () => {
 			expect(warn).toHaveBeenCalledTimes(1);
 			const [line] = warn.mock.calls[0] ?? [];
 			expect(typeof line).toBe("string");
-			expect(JSON.parse(line as string)).toEqual({
+			const logged = JSON.parse(line as string);
+			expect(logged).toMatchObject({
 				event: "stale_revision",
 				vaultId: "vault-1",
 				localVaultId: "local-vault-mac",
@@ -162,7 +163,61 @@ describe("sqlite backend: mutation commits", () => {
 				expectedBaseRevision: 2,
 				receivedBaseRevision: 1,
 			});
+			// The history says which local vault wrote the revision the client
+			// is missing, and the envelope's shape - enough to tell a revision
+			// sealed differently from one that was not - but never its content.
+			expect(logged.current).toMatchObject({
+				revision: 2,
+				byLocalVaultId: "local-vault-mac",
+				deleted: false,
+				hasBlob: false,
+				metadata: { unparseable: true, length: "secret-ciphertext".length },
+			});
+			expect(Array.isArray(logged.versions)).toBe(true);
 			expect(line).not.toContain("secret-ciphertext");
+		} finally {
+			warn.mockRestore();
+		}
+	});
+
+	it("describes a metadata envelope by its version and lengths only", async () => {
+		const { mutationStore } = await createSqliteCoordinator();
+		const session = testSession({ localVaultId: "local-vault-phone" });
+		const envelope = JSON.stringify({ version: 2, nonce: "bm9uY2Utbm9uY2U=", ciphertext: "Y2lwaGVydGV4dC1ib2R5" });
+		const commit = (mutationId: string, baseRevision: number) =>
+			mutationStore.commitMutations(
+				session,
+				{
+					type: "commit_mutations",
+					requestId: `req-${mutationId}`,
+					mutations: [
+						{
+							mutationId,
+							entryId: "entry-1",
+							op: "upsert",
+							baseRevision,
+							blobId: null,
+							encryptedMetadata: envelope,
+						},
+					],
+				},
+				STAGE_GRACE_PERIOD_MS,
+				VERSION_HISTORY_RETENTION_MS,
+			);
+		await commit("mutation-1", 0);
+		const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+		try {
+			await commit("mutation-2", 0);
+
+			const logged = JSON.parse(warn.mock.calls[0]?.[0] as string);
+			expect(logged.current.metadata).toEqual({
+				version: 2,
+				nonceLength: "bm9uY2Utbm9uY2U=".length,
+				ciphertextLength: "Y2lwaGVydGV4dC1ib2R5".length,
+			});
+			expect(warn.mock.calls[0]?.[0]).not.toContain("Y2lwaGVydGV4dC1ib2R5");
+			expect(warn.mock.calls[0]?.[0]).not.toContain("bm9uY2Utbm9uY2U=");
 		} finally {
 			warn.mockRestore();
 		}

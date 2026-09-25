@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 
 import * as doSchema from "../../../db/do";
 import type {
@@ -405,9 +405,74 @@ export class CoordinatorMutationStore {
 		});
 
 		for (const rejection of staleRejections) {
-			logStaleRevision(session, rejection);
+			logStaleRevision(session, rejection, this.describeEntryHistory(rejection.entryId));
 		}
 		return result;
+	}
+
+	/**
+	 * Who wrote the revisions a stale client is missing, and in what format.
+	 *
+	 * A client stuck behind the server cannot say why from its side: the
+	 * revision it cannot bring down is usually the one it cannot decrypt. The
+	 * server can say which local vault wrote each revision, when, and what
+	 * envelope version the metadata was sealed with, and that is what decided
+	 * the last investigation. Read only on a stale rejection, which is rare,
+	 * and never the content: only ids, revisions, times, reasons and lengths.
+	 */
+	private describeEntryHistory(entryId: string): EntryHistoryDescription {
+		const current = this.handle.db
+			.select({
+				revision: doSchema.entries.revision,
+				updatedSeq: doSchema.entries.updatedSeq,
+				updatedAt: doSchema.entries.updatedAt,
+				updatedByLocalVaultId: doSchema.entries.updatedByLocalVaultId,
+				deleted: doSchema.entries.deleted,
+				blobId: doSchema.entries.blobId,
+				encryptedMetadata: doSchema.entries.encryptedMetadata,
+			})
+			.from(doSchema.entries)
+			.where(eq(doSchema.entries.entryId, entryId))
+			.limit(1)
+			.get();
+		const versions = this.handle.db
+			.select({
+				sourceRevision: doSchema.entryVersions.sourceRevision,
+				opType: doSchema.entryVersions.opType,
+				reason: doSchema.entryVersions.reason,
+				capturedAt: doSchema.entryVersions.capturedAt,
+				createdByLocalVaultId: doSchema.entryVersions.createdByLocalVaultId,
+				blobId: doSchema.entryVersions.blobId,
+				encryptedMetadata: doSchema.entryVersions.encryptedMetadata,
+			})
+			.from(doSchema.entryVersions)
+			.where(eq(doSchema.entryVersions.entryId, entryId))
+			.orderBy(asc(doSchema.entryVersions.capturedAt))
+			.limit(MAX_LOGGED_VERSIONS)
+			.all();
+
+		return {
+			current: current
+				? {
+						revision: Number(current.revision),
+						updatedSeq: Number(current.updatedSeq),
+						updatedAt: Number(current.updatedAt),
+						byLocalVaultId: current.updatedByLocalVaultId,
+						deleted: Number(current.deleted) === 1,
+						hasBlob: current.blobId !== null,
+						metadata: describeEnvelope(current.encryptedMetadata),
+					}
+				: null,
+			versions: versions.map((version) => ({
+				revision: Number(version.sourceRevision),
+				op: version.opType,
+				reason: version.reason,
+				capturedAt: Number(version.capturedAt),
+				byLocalVaultId: version.createdByLocalVaultId,
+				hasBlob: version.blobId !== null,
+				metadata: describeEnvelope(version.encryptedMetadata),
+			})),
+		};
 	}
 
 }
@@ -425,7 +490,11 @@ type StaleRevisionRejection = {
  * two revisions saying how far behind it is. Only ids and revision numbers are
  * logged: never encrypted metadata, paths or tokens.
  */
-function logStaleRevision(session: SocketSession, rejection: StaleRevisionRejection): void {
+function logStaleRevision(
+	session: SocketSession,
+	rejection: StaleRevisionRejection,
+	history: EntryHistoryDescription,
+): void {
 	console.warn(
 		JSON.stringify({
 			event: "stale_revision",
@@ -434,6 +503,55 @@ function logStaleRevision(session: SocketSession, rejection: StaleRevisionReject
 			entryId: rejection.entryId,
 			expectedBaseRevision: rejection.expectedBaseRevision,
 			receivedBaseRevision: rejection.receivedBaseRevision,
+			...history,
 		}),
 	);
+}
+
+const MAX_LOGGED_VERSIONS = 20;
+
+type EnvelopeDescription = {
+	version: unknown;
+	nonceLength: number | null;
+	ciphertextLength: number | null;
+} | { unparseable: true; length: number };
+
+type EntryHistoryDescription = {
+	current: {
+		revision: number;
+		updatedSeq: number;
+		updatedAt: number;
+		byLocalVaultId: string;
+		deleted: boolean;
+		hasBlob: boolean;
+		metadata: EnvelopeDescription;
+	} | null;
+	versions: Array<{
+		revision: number;
+		op: string;
+		reason: string;
+		capturedAt: number;
+		byLocalVaultId: string;
+		hasBlob: boolean;
+		metadata: EnvelopeDescription;
+	}>;
+};
+
+/**
+ * The shape of a metadata envelope without any of its secret parts: the
+ * envelope version and the lengths of its nonce and ciphertext. A revision
+ * sealed in a different format, or truncated in transit, shows up here.
+ */
+function describeEnvelope(serialized: string): EnvelopeDescription {
+	try {
+		const envelope = JSON.parse(serialized) as Record<string, unknown>;
+		return {
+			version: envelope.version,
+			nonceLength: typeof envelope.nonce === "string" ? envelope.nonce.length : null,
+			ciphertextLength:
+				typeof envelope.ciphertext === "string" ? envelope.ciphertext.length : null,
+		};
+	} catch {
+		return { unparseable: true, length: serialized.length };
+	}
 }
