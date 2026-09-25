@@ -34,6 +34,38 @@ A vault that is genuinely idle shows: no requests, no store growth, no file
 changes. If the UI disagrees with all three, the bug is in the UI's idea of the
 state, not in the sync.
 
+### Measurements that could not see what they claimed to
+
+Measuring is not enough on its own; the measurement has to be able to detect
+the thing. These were all taken, and all misread:
+
+- **"The desktop's store isn't growing, so the desktop is idle."** A push that
+  the server keeps rejecting writes almost nothing locally. The desktop was
+  uploading one note every 0.9 seconds while its IndexedDB log grew 0 bytes.
+  The check was also taken three hours after the traffic it was meant to
+  explain.
+- **Not reading the device off the traffic.** Every request in a
+  `wrangler tail` capture carries a `user-agent` header (`Electron` means the
+  desktop app). It was captured, and never looked at, while the phone was
+  blamed.
+- **A 17-second window reported as "3 uploads a minute".** Short windows on
+  bursty traffic say nothing about the rate.
+- **Extrapolating 46 seconds to a day.** "160,000 requests a day" assumed a
+  loop that actually ran in episodes, and counted Durable Object stage calls as
+  Worker requests. A real 24-hour sample was 7,135.
+- **"Same 10 blobs" read off a flat `staged_blob_count`.** Blob ids are
+  redacted in the tail, and a re-queue reuses the blob id when the content is
+  unchanged, so a flat count could not tell two different loops apart.
+- **Declaring a fix without re-measuring.** 0.3.26 was shipped with "I'm not
+  calling this fixed until I've seen that number", and the number was never
+  taken. The loop was still running three weeks later.
+
+A capture worth trusting names the device (user-agent), the object (blob size
+is a fingerprint: a v2 envelope is the plaintext plus exactly 33 bytes), and
+runs long enough to cover a burst. The plugin's own local store can be decoded
+offline from a copy of its leveldb directory, which is how the stuck entry was
+finally read instead of guessed.
+
 ## The shapes that keep recurring
 
 ### One item fails, the batch dies
@@ -75,17 +107,59 @@ measurement, and it never reaches a conclusion.
   there, which changed nothing, so the next revision collided too — a new copy
   every few seconds.
 
-A fix for one of these can create another. Making the scan stop skipping a
-file with nothing on the server behind it fixed files that silently never
-synced - and became a loop, because when the upload could not succeed the next
-scan met exactly the condition the failure had left behind. A phone uploaded
-the same content about fifty-six times a minute, roughly 160,000 requests a
-day against a 100,000 request limit.
+- A commit rejected as stale was treated as progress: the rejection handler
+  returned normally, which cleared the failure counter, asked for a pull, and
+  looped at once. The pull only rebases a pending change when the page it
+  fetches contains that entry, so when the pull could not deliver the newer
+  revision - metadata this device cannot decrypt, a remote path this device
+  excludes, or a cursor already past the entry - the same note was uploaded
+  about once a second, indefinitely. Measured on the desktop: 837 uploads of
+  one 13,258-byte note in 12.8 minutes, every one accepted, nothing committed.
+  It ran from at least 1 September (0.3.21) until 0.3.27.
+
+That loop was first blamed on 0.3.26's predecessor, the change that made the
+scan re-queue files with nothing on the server behind them. It was observed
+before that change existed, and 0.3.26's bound on the scan never touched it.
+The re-queue did need a bound, but it was not the cause.
+
+Parking that loop's change forgot why it was parked. Every autosave of the
+note queued a new change on the same base, which the server rejected with the
+same pair of revisions and which therefore started over: two uploads, a fetch
+by id and a new notice per save. **Setting something aside has to remember
+what it set aside**, or the next instance of it is treated as new.
+
+**A retry path that returns a success-shaped result bypasses its own bound.**
+`MAX_COMMIT_ATTEMPTS` only counted rejections that threw. The stale branch
+returned normally and was never counted.
 
 **Before adding a corrective action, ask what makes it stop.** If it does not
 change what triggered it, it will run forever. Anything that retries needs a
 bound, and when the bound is reached the user has to be able to see what was
-set aside - `Files not syncing` is where that goes.
+set aside - `Files not syncing` is where that goes. Since 0.3.27, a sync pass
+that pushes nothing, requeues something, and pulls nothing backs off instead of
+looping - a safety net for whatever the next non-converging path turns out to
+be.
+
+### Transient failures classified as permanent
+
+A retry that is un-done by the next event turns into episodes. The stale loop
+did not run continuously: an ordinary network hiccup during an upload
+(`net::ERR_CONNECTION_RESET`, `sync token expired`, a 503) was treated as a
+permanent failure and parked the note, and the next reconnect un-parked it and
+the loop resumed. The error-marker list matched "connection reset" with a
+space; Chromium reports `net::ERR_CONNECTION_RESET` with underscores.
+
+**Classify errors against the strings the platform actually produces** - take
+them from the user's Recent problems log, not from memory - and keep "offline"
+(which drives the status) separate from "try again later" (which drives
+retries). Parking is for failures that will happen again; retrying is for
+everything else, and it still needs a bound.
+
+The reverse happened too. File-system errors carry the file's path, and a path
+is the user's own words: a note under `Offline maps/` matched the offline
+markers, so a file the OS would not hand over was retried on every push, with
+no count and no parking, and took the push down with it. Local file errors are
+now judged by their code before any text is matched.
 
 **Watch the request rate after shipping a retry change.** `npx wrangler tail`
 for a minute: an idle vault is a handful of requests, not hundreds.
@@ -131,6 +205,10 @@ More bugs than any other single cause.
   remotely and no device will ever write them.
 - Entry `9cb68646-0dbe-4e17-a8ce-c69569558cd5` — metadata that would not
   decrypt, cause never established. Skipped and reported; not resolved.
+- Entry `a72c4a5a-29ef-44bf-b74a-cbe420a6fc5e` — *The Lean Startup* note. The
+  desktop holds an edit based on revision 1 while the server is ahead, and it
+  never received the newer revision. This is the note that looped. 0.3.27
+  fetches it by id and merges, or sets it aside with the exact reason.
 
 ## Where things are recorded
 
