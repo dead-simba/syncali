@@ -582,11 +582,7 @@ export class FilesNotSyncingModal extends Modal {
 
     for (const file of files) {
       const row = new Setting(list).setName(file.path);
-      row.setDesc(
-        file.reason === "prepare_failed"
-          ? t("notSyncing.reasonPrepareFailed")
-          : t("notSyncing.reasonTooLarge"),
-      );
+      row.setDesc(describeNotSyncingReason(file));
     }
 
     new Setting(contentEl).addButton((button) =>
@@ -609,6 +605,22 @@ export class FilesNotSyncingModal extends Modal {
 
   onClose(): void {
     this.contentEl.empty();
+  }
+}
+
+export function describeNotSyncingReason(file: SynchFileSizeBlockedFile): string {
+  if (file.op === "delete") {
+    return file.reason === "stale_unresolved"
+      ? t("notSyncing.reasonDeleteStaleUnresolved")
+      : t("notSyncing.reasonDeletePrepareFailed");
+  }
+  switch (file.reason) {
+    case "prepare_failed":
+      return t("notSyncing.reasonPrepareFailed");
+    case "stale_unresolved":
+      return t("notSyncing.reasonStaleUnresolved");
+    default:
+      return t("notSyncing.reasonTooLarge");
   }
 }
 

@@ -32,6 +32,11 @@ type ClientMessage =
       limit: number;
     }
   | {
+      type: "get_entry_states";
+      requestId: string;
+      entryIds: string[];
+    }
+  | {
       type: "list_entry_versions";
       requestId: string;
       entryId: string;
@@ -259,6 +264,7 @@ export class SyncRealtimeSocketSession {
       parsed.type === "commit_rejected" ||
       parsed.type === "commit_mutations_failed" ||
       parsed.type === "entry_states_list_failed" ||
+      parsed.type === "entry_states_by_id_failed" ||
       parsed.type === "entry_versions_list_failed" ||
       parsed.type === "deleted_entries_list_failed" ||
       parsed.type === "entry_restore_failed" ||

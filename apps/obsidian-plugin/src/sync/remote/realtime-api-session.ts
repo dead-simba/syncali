@@ -17,8 +17,16 @@ import type {
   SyncRealtimeSession,
   SyncStorageStatus,
 } from "./realtime-types";
-import { SyncRealtimeError } from "./realtime-types";
-import type { EntryStatePageCursor, ListEntryStatesResponse } from "./changes";
+import {
+  MAX_ENTRY_STATES_BY_ID,
+  SYNC_FEATURE_GET_ENTRY_STATES,
+  SyncRealtimeError,
+} from "./realtime-types";
+import type {
+  EntryStatePageCursor,
+  ListEntryStatesResponse,
+  RemoteEntryState,
+} from "./changes";
 import type { SyncRealtimeSocketSession } from "./realtime-socket-session";
 
 export function applySessionStorageLimit(
@@ -33,6 +41,7 @@ export function applySessionStorageLimit(
 
 export class SyncRealtimeApiSession implements SyncRealtimeSession {
   readonly serverCursor: number;
+  readonly features: readonly string[];
 
   constructor(
     private readonly transport: SyncRealtimeSocketSession,
@@ -40,6 +49,12 @@ export class SyncRealtimeApiSession implements SyncRealtimeSession {
     private readonly state: RealtimeSessionState,
   ) {
     this.serverCursor = hello.cursor;
+    // Older servers send no list at all. Anything that is not a list of
+    // strings is treated the same way, so a malformed frame can never make
+    // the client send a message the server does not understand.
+    this.features = Array.isArray(hello.features)
+      ? hello.features.filter((feature): feature is string => typeof feature === "string")
+      : [];
   }
 
   get storageUsedBytes(): number {
@@ -101,6 +116,41 @@ export class SyncRealtimeApiSession implements SyncRealtimeSession {
       nextAfter: message.nextAfter,
       entries: message.entries,
     };
+  }
+
+  async getEntryStatesById(entryIds: string[]): Promise<RemoteEntryState[]> {
+    // An old server answers an unknown message type with a session error that
+    // has no requestId, which fails every request in flight on this socket -
+    // a pull or a commit that had nothing to do with this one. Refuse here
+    // rather than rely on every caller remembering to check.
+    if (!this.features.includes(SYNC_FEATURE_GET_ENTRY_STATES)) {
+      throw new SyncRealtimeError(
+        "feature_unavailable",
+        "This Syncali server cannot fetch individual entries.",
+      );
+    }
+
+    const unique = [...new Set(entryIds)];
+    if (
+      unique.length === 0 ||
+      unique.length > MAX_ENTRY_STATES_BY_ID ||
+      unique.some((entryId) => typeof entryId !== "string" || entryId.length === 0)
+    ) {
+      throw new Error(
+        `get_entry_states needs 1 to ${MAX_ENTRY_STATES_BY_ID} non-empty entry ids.`,
+      );
+    }
+
+    const message = await this.transport.request({
+      type: "get_entry_states",
+      entryIds: unique,
+    });
+
+    if (message.type !== "entry_states_by_id") {
+      throw new Error("get entry states did not produce an entry_states_by_id response");
+    }
+
+    return message.entries;
   }
 
   async listEntryVersions(input: {

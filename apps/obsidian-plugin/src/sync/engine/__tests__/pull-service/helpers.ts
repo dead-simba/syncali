@@ -228,6 +228,7 @@ export function createRealtimeSession(input: {
 
   return {
     serverCursor: 0,
+    features: [],
     storageUsedBytes: 0,
     storageLimitBytes: 100_000_000,
     maxFileSizeBytes: 3_000_000,
@@ -276,6 +277,9 @@ export function createRealtimeSession(input: {
           updatedAt: commit.committedAt,
         })),
       };
+    },
+    async getEntryStatesById() {
+      throw new Error("pull tests should not fetch entry states by id");
     },
     async listEntryVersions() {
       throw new Error("pull tests should not list entry versions");

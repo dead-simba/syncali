@@ -40,7 +40,12 @@ export type {
   SyncStorageStatus,
   WebSocketFactory,
 } from "./realtime-types";
-export { SyncRealtimeConnectionError, SyncRealtimeError } from "./realtime-types";
+export {
+  MAX_ENTRY_STATES_BY_ID,
+  SYNC_FEATURE_GET_ENTRY_STATES,
+  SyncRealtimeConnectionError,
+  SyncRealtimeError,
+} from "./realtime-types";
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
 const DEFAULT_HEARTBEAT_INTERVAL_MS = 30_000;

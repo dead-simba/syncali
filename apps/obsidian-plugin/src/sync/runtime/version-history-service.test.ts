@@ -773,6 +773,7 @@ function createRealtimeSession(
 ): SyncRealtimeSession {
   return {
     serverCursor: 0,
+    features: [],
     storageUsedBytes: 0,
     storageLimitBytes: 100_000_000,
     maxFileSizeBytes: 3_000_000,
@@ -785,6 +786,7 @@ function createRealtimeSession(
       nextAfter: null,
       entries: [],
     })),
+    getEntryStatesById: vi.fn(async () => []),
     listEntryVersions: vi.fn(),
     listDeletedEntries: vi.fn(async () => ({
       entries: [],

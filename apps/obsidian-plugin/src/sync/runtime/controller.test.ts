@@ -240,6 +240,34 @@ describe("SyncController", () => {
     await expect(controller.listFileSizeBlockedFiles()).resolves.toEqual([]);
     expect(listFileSizeBlockedFiles).not.toHaveBeenCalled();
   });
+
+  it("un-parks every set-aside change before re-scanning when the user asks to retry", async () => {
+    // A re-scan alone leaves a parked change to an already-synced file where
+    // it is, and a stale one is never retried by a reconnect - so without this
+    // the button would do nothing for exactly the files it lists.
+    vi.spyOn(SyncEngine.prototype, "hasStore").mockReturnValue(true);
+    const retryParkedMutations = vi
+      .spyOn(SyncEngine.prototype, "retryParkedMutations")
+      .mockResolvedValue(1);
+    vi.spyOn(SyncEngine.prototype, "reapplyAllowedRemoteVaultConfig").mockResolvedValue(0);
+    const reconcileOnce = vi.spyOn(SyncEngine.prototype, "reconcileOnce").mockResolvedValue({
+      filesScanned: 1,
+      filesQueuedForUpsert: 0,
+      filesQueuedForDelete: 0,
+    });
+    const notifyLocalChange = vi
+      .spyOn(SyncEngine.prototype, "notifyLocalChange")
+      .mockImplementation(() => {});
+
+    const controller = new SyncController(createDeps());
+    await controller.retryFilesNotSyncing();
+
+    expect(retryParkedMutations).toHaveBeenCalledTimes(1);
+    expect(retryParkedMutations.mock.invocationCallOrder[0]).toBeLessThan(
+      reconcileOnce.mock.invocationCallOrder[0] ?? 0,
+    );
+    expect(notifyLocalChange).toHaveBeenCalled();
+  });
 });
 
 function createDeps(

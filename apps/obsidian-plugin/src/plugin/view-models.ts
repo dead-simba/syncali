@@ -43,7 +43,8 @@ export interface SynchStorageStatus {
 }
 
 export interface SynchFileSizeBlockedFile {
-  reason?: "file_too_large" | "prepare_failed";
+  reason?: "file_too_large" | "prepare_failed" | "stale_unresolved";
+  op?: "upsert" | "delete";
   path: string;
   encryptedSizeBytes: number | null;
   maxFileSizeBytes: number | null;

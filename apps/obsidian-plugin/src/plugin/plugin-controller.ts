@@ -611,7 +611,7 @@ export class SynchPluginController implements SynchSettingsController {
    * to discover - a file that is not syncing needs a button, not a trick.
    */
   async retryFilesNotSyncing(): Promise<void> {
-    await this.syncController.reconcileAfterFileRuleChange();
+    await this.syncController.retryFilesNotSyncing();
   }
 
   getPluginVersion(): string {

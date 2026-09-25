@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { findCoveringParent } from "./modals";
+import { describeNotSyncingReason, findCoveringParent } from "./modals";
 
 const sortByDepthAsc = (folders: string[]): string[] =>
   [...folders].sort((left, right) => left.length - right.length);
@@ -38,5 +38,40 @@ describe("findCoveringParent", () => {
     expect(
       findCoveringParent("Foo/Bar", sortByDepthAsc(["Foo", "Foo/Bar"])),
     ).toBe("Foo");
+  });
+});
+
+describe("describeNotSyncingReason", () => {
+  const file = { path: "note.md", encryptedSizeBytes: null, maxFileSizeBytes: null };
+
+  it("says a stale change is kept, not lost", () => {
+    expect(describeNotSyncingReason({ ...file, reason: "stale_unresolved" })).toBe(
+      "The server has a newer version this device could not bring down. Your edit is kept here and has not been lost.",
+    );
+  });
+
+  it("keeps the existing reasons", () => {
+    expect(describeNotSyncingReason({ ...file, reason: "prepare_failed" })).toBe(
+      "Could not be prepared for upload",
+    );
+    expect(describeNotSyncingReason({ ...file, reason: "file_too_large" })).toBe(
+      "Larger than the file size limit",
+    );
+    expect(describeNotSyncingReason(file)).toBe("Larger than the file size limit");
+  });
+});
+
+describe("describeNotSyncingReason for a delete", () => {
+  const file = { path: "note.md", encryptedSizeBytes: null, maxFileSizeBytes: null };
+
+  it("says the file is gone here but not from other devices", () => {
+    expect(
+      describeNotSyncingReason({ ...file, op: "delete", reason: "stale_unresolved" }),
+    ).toBe(
+      "Deleted on this device, but the server has a newer version this device could not bring down. Your other devices still have this file.",
+    );
+    expect(describeNotSyncingReason({ ...file, op: "delete", reason: "prepare_failed" })).toBe(
+      "Deleted on this device, but the delete could not be prepared for upload. Your other devices still have this file.",
+    );
   });
 });

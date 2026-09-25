@@ -101,13 +101,24 @@ export interface PullEntryStateStore
     Pick<
       SyncMutationStore,
       | "clearDirtyEntryByMutationId"
+      | "getDirtyEntryMutation"
       | "listDirtyEntries"
       | "markEntryDirty"
       | "replaceDirtyEntry"
     >,
     Pick<SyncBlobStore, "getBlob" | "putBlob"> {}
 
-export type PullEntryStateWindowApplyResult = PullEntryStateApplyResult & {
+/**
+ * What applying a manifest did, including what happened to each pending local
+ * change it ran into. The counts alone cannot tell "the server already had
+ * this" from "the local change was dropped", and a caller reconciling one
+ * specific change needs to know which.
+ */
+export type PullEntryStateManifestApplyResult = PullEntryStateApplyResult & {
+  pendingConflicts: PullConflictEvent[];
+};
+
+export type PullEntryStateWindowApplyResult = PullEntryStateManifestApplyResult & {
   deferred: PullEntryStateManifestItem[];
 };
 
@@ -182,7 +193,7 @@ export class PullEntryStateApplier {
     store: PullEntryStateStore,
     token: SyncTokenResponse,
     manifest: PullEntryStateManifestItem[],
-  ): Promise<PullEntryStateApplyResult> {
+  ): Promise<PullEntryStateManifestApplyResult> {
     const applied = await this.applyManifestWindow(store, token, manifest, {
       finalWindow: true,
     });
@@ -191,6 +202,7 @@ export class PullEntryStateApplier {
       filesWritten: applied.filesWritten,
       filesDeleted: applied.filesDeleted,
       conflictsCreated: applied.conflictsCreated,
+      pendingConflicts: applied.pendingConflicts,
     };
   }
 
@@ -212,6 +224,7 @@ export class PullEntryStateApplier {
         filesWritten: 0,
         filesDeleted: 0,
         conflictsCreated: 0,
+        pendingConflicts: [],
         deferred: [],
       };
     }
@@ -235,6 +248,9 @@ export class PullEntryStateApplier {
           (plan.pathConflict?.conflictPath ? 1 : 0) +
           (plan.pendingConflict?.conflictPath ? 1 : 0),
         0,
+      ),
+      pendingConflicts: prepared.plans.flatMap((plan) =>
+        plan.pendingConflict ? [plan.pendingConflict] : [],
       ),
       deferred: prepared.deferred,
     };
@@ -332,6 +348,17 @@ export class PullEntryStateApplier {
     const applied = new Set(appliedPlans);
     for (const plan of allPlans) {
       if (applied.has(plan)) {
+        continue;
+      }
+      // A local change waiting on this entry keeps the remote state it was
+      // built on. The server's revision is not written here, so the change
+      // is not rebased or merged with it, and recording it anyway made the
+      // next edit build on a revision this device never merged: the server
+      // accepted that edit over the other device's, at the old path, with no
+      // merge and no conflict copy. Left alone, the change is rejected as
+      // stale and set aside instead. `applyEntryStatesById` follows the same
+      // rule.
+      if (await store.getDirtyEntryMutation(plan.state.entryId)) {
         continue;
       }
 

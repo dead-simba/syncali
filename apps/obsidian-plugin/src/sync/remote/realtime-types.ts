@@ -2,7 +2,22 @@ import type { SyncTokenResponse } from "./client";
 import type {
   EntryStatePageCursor,
   ListEntryStatesResponse,
+  RemoteEntryState,
 } from "./changes";
+
+/**
+ * Optional server capabilities, advertised in `hello_ack.features`.
+ *
+ * A server that predates a feature answers its message type with a
+ * session-level error that carries no requestId, which fails every request in
+ * flight and not just the one that used it. So a client only ever sends a
+ * feature's messages when the session it is talking to said it understands
+ * them, and treats a missing list as "no features".
+ */
+export const SYNC_FEATURE_GET_ENTRY_STATES = "get_entry_states";
+
+/** The most entry ids one `get_entry_states` request may carry. */
+export const MAX_ENTRY_STATES_BY_ID = 100;
 
 export interface SyncRealtimeCallbacks {
   onCursorAdvanced(cursor: number): void;
@@ -73,6 +88,8 @@ export interface PurgeDeletedEntryPayload {
 
 export interface SyncRealtimeSession {
   serverCursor: number;
+  /** What the server said it supports when the session started. */
+  readonly features: readonly string[];
   storageUsedBytes: number;
   storageLimitBytes: number;
   maxFileSizeBytes: number;
@@ -84,6 +101,12 @@ export interface SyncRealtimeSession {
     after: EntryStatePageCursor | null;
     limit: number;
   }): Promise<ListEntryStatesResponse>;
+  /**
+   * The current state of specific entries, without touching the pull cursor.
+   * Ids the server does not know are omitted. Only valid when `features`
+   * includes `get_entry_states`; it throws rather than send otherwise.
+   */
+  getEntryStatesById(entryIds: string[]): Promise<RemoteEntryState[]>;
   listEntryVersions(input: {
     entryId: string;
     before: EntryVersionPageCursor | null;
@@ -233,6 +256,8 @@ export type ServerMessage =
       cursor: number;
       policy: SyncPolicy;
       storageStatus: SyncStorageStatus;
+      /** Absent on servers that predate feature negotiation. */
+      features?: string[];
     }
   | {
       type: "cursor_advanced";
@@ -280,6 +305,17 @@ export type ServerMessage =
     } & ListEntryStatesResponse)
   | {
       type: "entry_states_list_failed";
+      requestId: string;
+      code: string;
+      message: string;
+    }
+  | {
+      type: "entry_states_by_id";
+      requestId: string;
+      entries: RemoteEntryState[];
+    }
+  | {
+      type: "entry_states_by_id_failed";
       requestId: string;
       code: string;
       message: string;
@@ -348,4 +384,9 @@ export type RealtimeSessionState = {
   policy: SyncPolicy;
 };
 
-export type { EntryStatePageCursor, ListEntryStatesResponse, SyncTokenResponse };
+export type {
+  EntryStatePageCursor,
+  ListEntryStatesResponse,
+  RemoteEntryState,
+  SyncTokenResponse,
+};

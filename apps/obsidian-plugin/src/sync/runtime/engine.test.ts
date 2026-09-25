@@ -7,9 +7,10 @@ import { encodeUtf8, hashBytes } from "../core/content";
 import { encryptSyncBlob } from "../core/crypto";
 import { DEFAULT_SYNC_FILE_RULES } from "../core/file-rules";
 import { DEFAULT_VAULT_CONFIG_SYNC_RULES } from "../core/vault-config-rules";
-import { queueLocalUpsertMutation } from "../core/mutation-queue";
+import { queueLocalDeleteMutation, queueLocalUpsertMutation } from "../core/mutation-queue";
 import type { SyncTokenResponse } from "../remote/client";
 import { createInitializedTestSyncStore } from "../../test-support/test-plugin";
+import { StaleMutationUnresolvedError } from "../engine/push-stale-recovery";
 import { SyncEngine } from "./engine";
 
 type VaultEventCallback = (...args: unknown[]) => void;
@@ -68,6 +69,7 @@ describe("SyncEngine", () => {
     await expect(engine.listFileSizeBlockedFiles()).resolves.toEqual([
       {
         path: "Folder/large.md",
+        op: "upsert",
         // Carried so the UI can say why a file is not syncing: a size limit is
         // something the user can act on, a preparation failure is not.
         reason: "file_too_large",
@@ -75,6 +77,240 @@ describe("SyncEngine", () => {
         maxFileSizeBytes: 10_000_000,
       },
     ]);
+    await store.close();
+  });
+
+  it("lists a change set aside as unresolvably stale under Files not syncing", async () => {
+    const plugin = createPlugin({}, async () => encodeUtf8("body"));
+    const store = await createInitializedTestSyncStore(plugin);
+    const stale = await queueLocalUpsertMutation(store, {
+      remoteVaultKey: TEST_VAULT_KEY,
+      path: "Notes/The Lean Startup.md",
+      entryId: "entry-stale",
+      base: { revision: 1, deleted: false, blobId: "blob-base", hash: "hash-base" },
+      hash: "hash-local",
+    });
+    await store.updateDirtyEntry({
+      ...stale.mutation,
+      status: "blocked",
+      blockedReason: "stale_unresolved",
+    });
+    const engine = createEngine(plugin);
+    engine.setStore(store);
+
+    await expect(engine.listFileSizeBlockedFiles()).resolves.toEqual([
+      {
+        path: "Notes/The Lean Startup.md",
+        op: "upsert",
+        reason: "stale_unresolved",
+        encryptedSizeBytes: null,
+        maxFileSizeBytes: null,
+      },
+    ]);
+    await store.close();
+  });
+
+  it("names the file, keeps the edit, and carries the revisions when a stale change is set aside", async () => {
+    const plugin = createPlugin({}, async () => encodeUtf8("body"));
+    const store = await createInitializedTestSyncStore(plugin);
+    const stale = await queueLocalUpsertMutation(store, {
+      remoteVaultKey: TEST_VAULT_KEY,
+      path: "Notes/The Lean Startup.md",
+      entryId: "entry-stale",
+      base: { revision: 1, deleted: false, blobId: "blob-base", hash: "hash-base" },
+      hash: "hash-local",
+    });
+    const notifyError = vi.fn();
+    const engine = createEngine(plugin, { notifyError });
+    engine.setStore(store);
+
+    await (
+      engine as unknown as {
+        describeQuarantinedMutation: (event: unknown) => Promise<void>;
+      }
+    ).describeQuarantinedMutation({
+      entryId: "entry-stale",
+      mutationId: stale.mutation.mutationId,
+      error: new StaleMutationUnresolvedError({
+        entryId: "entry-stale",
+        mutationId: stale.mutation.mutationId,
+        op: "upsert",
+        serverRevision: 7,
+        baseRevision: 1,
+        outcome: { resolved: false, reason: "undecryptable", remoteRevision: 7 },
+      }),
+    });
+
+    expect(notifyError).toHaveBeenCalledTimes(1);
+    const message = (notifyError.mock.calls[0]?.[0] as Error).message;
+    expect(message).toContain('"Notes/The Lean Startup.md" was not uploaded');
+    expect(message).toContain("Your edit is kept on this device and has not been lost.");
+    expect(message).toContain("save it again");
+    expect(message).toContain(
+      "(server revision 7, this device's base revision 1: set aside, the server's revision 7 could not be decrypted on this device)",
+    );
+    await store.close();
+  });
+
+  it("lists a parked delete under Files not syncing, so it can be tried again", async () => {
+    // A reconnect never un-parks a stale change, and a deleted file cannot be
+    // edited to wake it up. Left off this list, a delete parked here never
+    // reached the server and nothing said so.
+    const plugin = createPlugin({}, async () => encodeUtf8("body"));
+    const store = await createInitializedTestSyncStore(plugin);
+    const parked = await queueLocalDeleteMutation(store, {
+      remoteVaultKey: TEST_VAULT_KEY,
+      path: "Notes/Old idea.md",
+      entryId: "entry-deleted",
+      base: { revision: 1, deleted: false, blobId: "blob-base", hash: "hash-base" },
+    });
+    await store.updateDirtyEntry({
+      ...parked,
+      status: "blocked",
+      blockedReason: "stale_unresolved",
+    });
+    const engine = createEngine(plugin);
+    engine.setStore(store);
+
+    await expect(engine.listFileSizeBlockedFiles()).resolves.toEqual([
+      {
+        path: "Notes/Old idea.md",
+        op: "delete",
+        reason: "stale_unresolved",
+        encryptedSizeBytes: null,
+        maxFileSizeBytes: null,
+      },
+    ]);
+    await expect(engine.retryParkedMutations()).resolves.toBe(1);
+    await expect(engine.listFileSizeBlockedFiles()).resolves.toEqual([]);
+    await store.close();
+  });
+
+  it("says a parked delete did not reach other devices, not that an edit is kept", async () => {
+    const plugin = createPlugin({}, async () => encodeUtf8("body"));
+    const store = await createInitializedTestSyncStore(plugin);
+    const parked = await queueLocalDeleteMutation(store, {
+      remoteVaultKey: TEST_VAULT_KEY,
+      path: "Notes/Old idea.md",
+      entryId: "entry-deleted",
+      base: { revision: 1, deleted: false, blobId: "blob-base", hash: "hash-base" },
+    });
+    const notifyError = vi.fn();
+    const engine = createEngine(plugin, { notifyError });
+    engine.setStore(store);
+
+    await (
+      engine as unknown as {
+        describeQuarantinedMutation: (event: unknown) => Promise<void>;
+      }
+    ).describeQuarantinedMutation({
+      entryId: "entry-deleted",
+      mutationId: parked.mutationId,
+      error: new StaleMutationUnresolvedError({
+        entryId: "entry-deleted",
+        mutationId: parked.mutationId,
+        op: "delete",
+        serverRevision: 3,
+        baseRevision: 1,
+        outcome: { resolved: false, reason: "fetch_unavailable" },
+      }),
+    });
+
+    const message = (notifyError.mock.calls[0]?.[0] as Error).message;
+    expect(message).toContain('Deleting "Notes/Old idea.md" did not reach the server');
+    expect(message).toContain("your other devices still have it");
+    expect(message).not.toContain("Your edit is kept");
+    expect(message).not.toContain("copy your edit");
+    expect(message).toContain("Try these again under Files not syncing");
+    await store.close();
+  });
+
+  it("never tells a parked delete to do what would undo it", async () => {
+    // Re-saving the note elsewhere or syncing its path lets the server's newer
+    // version come down, and the pull keeps that version over a delete made
+    // from an older one: the file comes back. Only deleting it on a device
+    // that has the newer version removes it everywhere.
+    const plugin = createPlugin({}, async () => encodeUtf8("body"));
+    const store = await createInitializedTestSyncStore(plugin);
+    const parked = await queueLocalDeleteMutation(store, {
+      remoteVaultKey: TEST_VAULT_KEY,
+      path: "Notes/Old idea.md",
+      entryId: "entry-deleted",
+      base: { revision: 1, deleted: false, blobId: "blob-base", hash: "hash-base" },
+    });
+    const notifyError = vi.fn();
+    const engine = createEngine(plugin, { notifyError });
+    engine.setStore(store);
+
+    for (const outcome of [
+      { resolved: false, reason: "undecryptable", remoteRevision: 3 },
+      { resolved: false, reason: "excluded", remoteRevision: 3, remotePath: "Private/Old idea.md" },
+    ] as const) {
+      await (
+        engine as unknown as {
+          describeQuarantinedMutation: (event: unknown) => Promise<void>;
+        }
+      ).describeQuarantinedMutation({
+        entryId: "entry-deleted",
+        mutationId: parked.mutationId,
+        error: new StaleMutationUnresolvedError({
+          entryId: "entry-deleted",
+          mutationId: parked.mutationId,
+          op: "delete",
+          serverRevision: 3,
+          baseRevision: 1,
+          outcome,
+        }),
+      });
+    }
+
+    expect(notifyError).toHaveBeenCalledTimes(2);
+    for (const [error] of notifyError.mock.calls) {
+      const message = (error as Error).message;
+      expect(message).not.toContain("save it again");
+      expect(message).not.toContain("Change your sync rules");
+      expect(message).toContain("delete it on");
+    }
+    await store.close();
+  });
+
+  it("records how a stale change was settled without showing a notice", async () => {
+    const plugin = createPlugin({}, async () => encodeUtf8("body"));
+    const store = await createInitializedTestSyncStore(plugin);
+    await store.upsertEntry({
+      entryId: "entry-stale",
+      path: "Notes/The Lean Startup.md",
+      revision: 8,
+      blobId: "blob-8",
+      hash: "hash-8",
+      deleted: false,
+      updatedAt: 1,
+      localMtime: null,
+      localSize: null,
+    });
+    const notifyError = vi.fn();
+    const recordProblem = vi.fn();
+    const engine = createEngine(plugin, { notifyError, recordProblem });
+    engine.setStore(store);
+
+    await (
+      engine as unknown as {
+        recordStaleRecovery: (event: unknown) => Promise<void>;
+      }
+    ).recordStaleRecovery({
+      entryId: "entry-stale",
+      mutationId: "mutation-stale",
+      op: "upsert",
+      serverRevision: 7,
+      baseRevision: 1,
+      outcome: { resolved: true, how: "merged" },
+    });
+
+    expect(notifyError).not.toHaveBeenCalled();
+    expect(recordProblem).toHaveBeenCalledWith(
+      'Recovered "Notes/The Lean Startup.md" after the server rejected it as out of date ' +
+        "(server revision 7, this device's base revision 1: merged with the server's version).",
+    );
     await store.close();
   });
 

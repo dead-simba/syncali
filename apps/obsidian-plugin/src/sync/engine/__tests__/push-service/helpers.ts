@@ -29,6 +29,7 @@ export function createPushSession(
 ): SyncRealtimeSession {
   return {
     serverCursor: 0,
+    features: [],
     storageUsedBytes: 0,
     storageLimitBytes: 100_000_000,
     maxFileSizeBytes: 3_000_000,
@@ -36,6 +37,9 @@ export function createPushSession(
     unwatchStorageStatus() {},
     async listEntryStates() {
       throw new Error("push tests should not list entry states");
+    },
+    async getEntryStatesById() {
+      throw new Error("push tests should not fetch entry states by id");
     },
     async listEntryVersions() {
       throw new Error("push tests should not list entry versions");

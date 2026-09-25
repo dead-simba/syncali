@@ -123,6 +123,43 @@ describe("Syncali file-size blocked decorator", () => {
     expect(large?.children).toHaveLength(0);
   });
 
+  it("does not mark a file for a parked delete of the same path", async () => {
+    // A parked delete is listed under Files not syncing by the path it had.
+    // A new file created at that path is a different entry, and syncing.
+    const root = createFileExplorerRoot(["reborn.md"]);
+    const decorator = new SynchFileSizeBlockedDecorator(
+      {
+        app: {
+          workspace: {
+            on: () => ({}),
+            getLeavesOfType: () => [{ view: { containerEl: root.asElement() } }],
+          },
+        },
+        register: () => {},
+        registerEvent: () => {},
+      } as unknown as Plugin,
+      {
+        async listFileSizeBlockedFiles() {
+          return [
+            {
+              path: "reborn.md",
+              op: "delete" as const,
+              reason: "stale_unresolved" as const,
+              encryptedSizeBytes: null,
+              maxFileSizeBytes: null,
+            },
+          ];
+        },
+      },
+    );
+    decorator.initialize();
+    await decorator.refresh();
+
+    const reborn = root.findByPath("reborn.md");
+    expect(reborn?.classList.contains("synch-file-size-blocked")).toBe(false);
+    expect(reborn?.children).toHaveLength(0);
+  });
+
   it("formats unknown blocked sizes without throwing", () => {
     expect(
       formatFileSizeBlockedTooltip({
@@ -131,6 +168,20 @@ describe("Syncali file-size blocked decorator", () => {
         maxFileSizeBytes: null,
       }),
     ).toContain("Encrypted: unknown. Limit: unknown.");
+  });
+
+  it("explains a stale change without talking about sizes", () => {
+    const tooltip = formatFileSizeBlockedTooltip({
+      path: "note.md",
+      reason: "stale_unresolved",
+      encryptedSizeBytes: null,
+      maxFileSizeBytes: null,
+    });
+
+    expect(tooltip).toContain("newer version");
+    expect(tooltip).toContain("has not been lost");
+    expect(tooltip).toContain("Try these again");
+    expect(tooltip).not.toContain("Encrypted");
   });
 });
 

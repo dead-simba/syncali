@@ -29,6 +29,8 @@ export async function openRealtimeSession(input: {
     storageUsedBytes: number;
     storageLimitBytes: number;
   };
+  /** Omitted from hello_ack entirely when undefined, as an old server does. */
+  helloFeatures?: unknown;
 } = {}): Promise<{
   socket: MockWebSocket;
   session: SyncRealtimeSession;
@@ -82,6 +84,7 @@ export async function openRealtimeSession(input: {
       storageUsedBytes: 24_300_000,
       storageLimitBytes: 100_000_000,
     },
+    ...(input.helloFeatures === undefined ? {} : { features: input.helloFeatures }),
   });
 
   return {

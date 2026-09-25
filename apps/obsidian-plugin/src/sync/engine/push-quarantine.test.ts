@@ -126,6 +126,54 @@ describe("a failing mutation does not stop the batch", () => {
   });
 });
 
+describe("failures that are not the file's fault", () => {
+  // Each of these parked a good note on a desktop, the next reconnect put it
+  // back, and it was uploaded again: the traffic came in episodes, one per
+  // dropped connection. Copied from that device's Recent problems.
+  it.each([
+    new Error("net::ERR_CONNECTION_RESET"),
+    new Error("net::ERR_NETWORK_CHANGED"),
+    new Error("net::ERR_NETWORK_IO_SUSPENDED"),
+    new Error("sync token expired"),
+    new Error("unexpected server error"),
+    Object.assign(new Error("error code: 1102"), { status: 503, code: "http_503" }),
+  ])("keeps $message queued for the retry backoff instead of parking the file", async (error) => {
+    const store = createStore([mutation("a")]);
+    const quarantined = vi.fn();
+    const service = new SyncPushService({
+      getApiBaseUrl: () => "https://example.invalid",
+      getSyncToken: async () => ({ token: "t", vaultId: "v" }) as never,
+      getSyncStore: () => store,
+      getRemoteVaultKey: () => new Uint8Array(32),
+      fileReader: { readBytes: async () => new Uint8Array() },
+      onProgress: async () => {},
+      onMutationQuarantined: quarantined,
+    } as never);
+
+    // Not rethrown: that would take every other file in the batch with it.
+    // The push reports it instead, and the auto-sync loop backs off.
+    await expect(
+      (
+        service as unknown as {
+          prepareOneOrQuarantine: (...args: unknown[]) => Promise<unknown>;
+        }
+      ).prepareOneOrQuarantine(
+        {
+          prepareMutationForCommit: async () => {
+            throw error;
+          },
+        },
+        store,
+        { token: "t", vaultId: "v" },
+        { maxFileSizeBytes: 0 },
+        mutation("a"),
+      ),
+    ).resolves.toEqual({ retryLater: true, error });
+    expect(store.updateDirtyEntry).not.toHaveBeenCalled();
+    expect(quarantined).not.toHaveBeenCalled();
+  });
+});
+
 describe("a commit the server keeps rejecting", () => {
   it("retries a transient rejection, then parks it once it is clearly stuck", async () => {
     // Observed in the wild: the same blob uploaded seven times in a row, every

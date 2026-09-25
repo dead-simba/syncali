@@ -28,6 +28,12 @@ import {
 } from "../engine/local-reconcile-service";
 import { metadataContextFromMutation } from "../engine/push-mutation-shared";
 import {
+  adviseOnUnresolvedStale,
+  describeStaleRecoveryOutcome,
+  StaleMutationUnresolvedError,
+  type StaleRecoveryEvent,
+} from "../engine/push-stale-recovery";
+import {
   ObsidianSyncVaultAdapter,
   type SyncVaultFile,
 } from "../vault/obsidian-vault-adapter";
@@ -82,6 +88,8 @@ export interface SyncEngineDeps {
   hasActiveRemoteVaultSession: () => boolean;
   notify: (message: string, timeout?: number) => void;
   notifyError: (error: unknown, contextKey: SynchErrorContextKey) => void;
+  /** Keep a line in Recent problems without showing a notice. */
+  recordProblem?: (message: string) => void;
   notifySyncConflict: (event: {
     op: "upsert" | "delete";
     reason?: "local_pending_mutation" | "remote_path_collision";
@@ -154,6 +162,11 @@ export class SyncEngine {
       // travelling. Name it, and say what makes it try again.
       void this.describeQuarantinedMutation(event);
     },
+    applyEntryStatesById: async (session, entryIds) =>
+      await this.syncPullService.applyEntryStatesById(session, entryIds),
+    onStaleRecovery: (event) => {
+      void this.recordStaleRecovery(event);
+    },
   });
   private readonly syncLocalReconcileService = new SyncLocalReconcileService({
     getSyncStore: () => this.syncStore,
@@ -196,6 +209,7 @@ export class SyncEngine {
         }
         return unblocked + retried;
       }),
+    hasPendingMutations: async () => await this.hasPendingMutations(),
     pullOnce: async (session) =>
       await this.withSyncActivity("pull", async () => {
         return await this.syncPullService.pullOnce(session);
@@ -574,23 +588,29 @@ export class SyncEngine {
     mutationId: string;
     error: unknown;
   }): Promise<void> {
-    const store = this.syncStore;
-    let path = event.entryId;
-    if (store) {
-      try {
-        const mutation = await store.getDirtyEntryMutation(event.entryId);
-        if (mutation) {
-          const metadata = await decryptSyncMetadata(
-            this.deps.getRemoteVaultKey(),
-            mutation.encryptedMetadata,
-            metadataContextFromMutation(mutation),
-          );
-          path = metadata.path;
-        }
-      } catch {
-        // Falling back to the entry id is worse than a path but far better
-        // than staying silent about a file that has stopped syncing.
-      }
+    const path = await this.describeQueuedPath(event.entryId);
+
+    if (event.error instanceof StaleMutationUnresolvedError) {
+      // The generic wording below says the file "could not be synced", which
+      // reads as if the edit might be gone. It is not: the change is parked
+      // with the file untouched. Say that, say why, and carry the revisions so
+      // the cause can be read off the device afterwards.
+      const { outcome, op } = event.error.event;
+      this.deps.notifyError(
+        new Error(
+          op === "delete"
+            ? `Deleting "${path}" did not reach the server, because the server has a newer ` +
+                `version that this device could not bring down. The file stays deleted here, ` +
+                `but your other devices still have it. ${adviseOnUnresolvedStale(outcome, op)} ` +
+                `(${event.error.message})`
+            : `"${path}" was not uploaded because the server has a newer version that this ` +
+                `device could not bring down. Your edit is kept on this device and has not been ` +
+                `lost. ${adviseOnUnresolvedStale(outcome, op)} (${event.error.message})`,
+        ),
+        "error.autoSync",
+      );
+      this.deps.onFileSizeBlockedFilesChange?.();
+      return;
     }
 
     const reason = event.error instanceof Error ? event.error.message : String(event.error);
@@ -602,6 +622,51 @@ export class SyncEngine {
       "error.autoSync",
     );
     this.deps.onFileSizeBlockedFilesChange?.();
+  }
+
+  /**
+   * Record how a change the server kept rejecting as out of date was settled.
+   *
+   * Nothing is shown: a merge is what the user wanted, and a conflict copy
+   * already has its own notice. But which revisions were involved and how it
+   * ended is the only evidence of which fault was behind a stuck upload, so it
+   * is kept in Recent problems.
+   */
+  private async recordStaleRecovery(event: StaleRecoveryEvent): Promise<void> {
+    const path = await this.describeQueuedPath(event.entryId);
+    this.deps.recordProblem?.(
+      `Recovered "${path}" after the server rejected it as out of date ` +
+        `(${describeStaleRecoveryOutcome(event)}).`,
+    );
+  }
+
+  /**
+   * The path of an entry, for a message about it.
+   *
+   * The queued change is the best source because it is what the user edited.
+   * Falling back to the entry id is worse than a path but far better than
+   * staying silent about a file that has stopped syncing.
+   */
+  private async describeQueuedPath(entryId: string): Promise<string> {
+    const store = this.syncStore;
+    if (!store) {
+      return entryId;
+    }
+
+    try {
+      const mutation = await store.getDirtyEntryMutation(entryId);
+      if (mutation) {
+        const metadata = await decryptSyncMetadata(
+          this.deps.getRemoteVaultKey(),
+          mutation.encryptedMetadata,
+          metadataContextFromMutation(mutation),
+        );
+        return metadata.path;
+      }
+      return (await store.getEntryById(entryId))?.path ?? entryId;
+    } catch {
+      return entryId;
+    }
   }
 
   /**
@@ -658,17 +723,20 @@ export class SyncEngine {
     // Every blocked reason, not just size. A file parked because preparing it
     // failed is exactly as invisible to the user as an oversized one, and
     // strictly more surprising - they never chose to have a file that big.
+    //
+    // Deletes too. A parked delete is otherwise invisible and, for a stale
+    // one, unreachable: a reconnect does not retry it and a deleted file
+    // cannot be edited to wake it. This list and its Try these again button
+    // are the way back. The file explorer decoration ignores them, since
+    // there is no file there to decorate.
     const mutations = [
       ...(await store.listBlockedDirtyEntriesByReason("file_too_large")),
       ...(await store.listBlockedDirtyEntriesByReason("prepare_failed")),
+      ...(await store.listBlockedDirtyEntriesByReason("stale_unresolved")),
     ];
     const remoteVaultKey = this.deps.getRemoteVaultKey();
     const files: SyncFileSizeBlockedFile[] = [];
     for (const mutation of mutations) {
-      if (mutation.op !== "upsert") {
-        continue;
-      }
-
       const metadata = await decryptSyncMetadata(
         remoteVaultKey,
         mutation.encryptedMetadata,
@@ -676,6 +744,7 @@ export class SyncEngine {
       );
       files.push({
         path: metadata.path,
+        op: mutation.op,
         reason: mutation.blockedReason ?? "file_too_large",
         encryptedSizeBytes: mutation.blockedEncryptedSizeBytes ?? null,
         maxFileSizeBytes: mutation.blockedMaxFileSizeBytes ?? null,
@@ -738,6 +807,21 @@ export class SyncEngine {
       entryId,
       fallbackPath,
     );
+  }
+
+  /**
+   * Put every set-aside change back in the queue, including the ones a
+   * reconnect deliberately leaves alone, because the user asked.
+   */
+  async retryParkedMutations(): Promise<number> {
+    const retried = await this.runLocalMutationWork(
+      async () => await this.syncPushService.retryParkedMutations(),
+    );
+    if (retried > 0) {
+      await this.syncStore?.flush();
+      this.deps.onFileSizeBlockedFilesChange?.();
+    }
+    return retried;
   }
 
   async waitForLocalMutationWork(): Promise<void> {
@@ -832,9 +916,12 @@ export interface SyncFileSizeBlockedFile {
   /**
    * Why this file is not syncing. `file_too_large` is a limit the user can act
    * on; `prepare_failed` means the change could not be prepared and would fail
-   * again, so it is parked rather than retried forever.
+   * again, so it is parked rather than retried forever; `stale_unresolved`
+   * means the server holds a newer version this device could not bring down.
    */
-  reason?: "file_too_large" | "prepare_failed";
+  reason?: "file_too_large" | "prepare_failed" | "stale_unresolved";
+  /** Absent means an upsert, which is all this list held before deletes. */
+  op?: "upsert" | "delete";
   path: string;
   encryptedSizeBytes: number | null;
   maxFileSizeBytes: number | null;

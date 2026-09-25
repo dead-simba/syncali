@@ -70,6 +70,7 @@ export function createRealtimeClient(
       onOpen?.(callbacks);
       const session: SyncRealtimeSession = {
         serverCursor,
+        features: [],
         storageUsedBytes: 0,
         storageLimitBytes: 100_000_000,
         maxFileSizeBytes: 3_000_000,
@@ -83,6 +84,9 @@ export function createRealtimeClient(
             nextAfter: null,
             entries: [],
           };
+        },
+        async getEntryStatesById() {
+          throw new Error("auto-sync tests should not fetch entry states by id");
         },
         async listEntryVersions() {
           throw new Error("auto-sync tests should not list entry versions");

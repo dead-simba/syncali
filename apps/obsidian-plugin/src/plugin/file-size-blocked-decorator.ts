@@ -72,7 +72,13 @@ export class SynchFileSizeBlockedDecorator {
   }
 
   private decorate(blockedFiles: SynchFileSizeBlockedFile[]): void {
-    const blockedByPath = new Map(blockedFiles.map((file) => [file.path, file]));
+    // A parked delete has no file to mark. Anything now at its old path is a
+    // different entry, and marking it would say the wrong file is stuck.
+    const blockedByPath = new Map(
+      blockedFiles
+        .filter((file) => file.op !== "delete")
+        .map((file) => [file.path, file]),
+    );
     for (const leaf of this.plugin.app.workspace.getLeavesOfType(FILE_EXPLORER_VIEW_TYPE)) {
       decorateFileExplorerElement(leaf.view.containerEl, blockedByPath);
     }
@@ -138,6 +144,15 @@ export function formatFileSizeBlockedTooltip(file: SynchFileSizeBlockedFile): st
         `限制: ${formatBytes(file.maxFileSizeBytes)}。`,
       ].join(" ");
     default:
+      if (file.reason === "stale_unresolved") {
+        // Sizes say nothing about this one, and "Encrypted: unknown" next to
+        // it would suggest they do.
+        return (
+          "The server has a newer version of this file that this device could not bring down, " +
+          "so your edit has been set aside. It is kept on this device and has not been lost. " +
+          "Choose Try these again under Files not syncing in Syncali settings."
+        );
+      }
       return [
         file.reason === "prepare_failed"
           ? "Syncali could not prepare this file for upload, so it has been set aside and the rest of your vault kept syncing. Editing or renaming it will make Syncali try again."

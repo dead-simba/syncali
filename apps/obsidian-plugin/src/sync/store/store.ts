@@ -66,7 +66,18 @@ export interface CachedSyncBlobRow {
 
 export type SyncBlobRole = "base" | "remote" | "local-cache";
 
-export type PendingMutationBlockedReason = "file_too_large" | "prepare_failed";
+/**
+ * Why a queued change is parked instead of pending.
+ *
+ * `stale_unresolved` is a change the server keeps rejecting as out of date,
+ * where fetching the server's newer version did not reconcile it. Unlike
+ * `prepare_failed` it is not retried on every reconnect - see
+ * `SyncPushService.retryQuarantinedMutations`.
+ */
+export type PendingMutationBlockedReason =
+  | "file_too_large"
+  | "prepare_failed"
+  | "stale_unresolved";
 
 export interface PendingMutationRow {
   mutationId: string;

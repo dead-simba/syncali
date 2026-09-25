@@ -89,6 +89,7 @@ export class SyncController {
     hasActiveRemoteVaultSession: () => this.deps.hasActiveRemoteVaultSession(),
     notify: (message, timeout) => this.notify(message, timeout),
     notifyError: (error, prefix) => this.deps.notifyError(error, prefix),
+    recordProblem: (message) => this.deps.recordProblem?.(message),
     notifySyncConflict: (event) => this.notifySyncConflict(event),
     notifyRollbackDetected: (event) => this.notifyRollbackDetected(event),
     setSyncProgress: (progress) => this.setSyncProgress(progress),
@@ -315,6 +316,23 @@ export class SyncController {
       this.setSyncStatus("attention_needed");
       this.deps.notifyError(error, "error.syncFileRuleUpdate");
     }
+  }
+
+  /**
+   * Put every set-aside file back in the queue, then re-scan the vault.
+   *
+   * The re-scan on its own re-queues a file that never reached the server, but
+   * it leaves a parked change to an already-synced file exactly where it is:
+   * the file is unchanged, so there is nothing new to queue. Those include
+   * the changes a reconnect deliberately does not retry, so un-park them here.
+   */
+  async retryFilesNotSyncing(): Promise<void> {
+    if (!this.deps.hasActiveRemoteVaultSession() || !this.syncEngine.hasStore()) {
+      return;
+    }
+
+    await this.syncEngine.retryParkedMutations();
+    await this.reconcileAfterFileRuleChange();
   }
 
   markOffline(): void {

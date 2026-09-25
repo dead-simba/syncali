@@ -37,12 +37,28 @@ export class PendingSyncWorkQueue {
     return this.pendingWork.push || this.pendingWork.pullTargetCursor !== null;
   }
 
-  takePendingWork(): PendingSyncWork {
+  /**
+   * Whether there is work that can run now. With `holdPush`, a requested push
+   * does not count: it is waiting for something else, such as a backoff.
+   */
+  hasRunnableWork(options: { holdPush: boolean }): boolean {
+    return (
+      (this.pendingWork.push && !options.holdPush) ||
+      this.pendingWork.pullTargetCursor !== null
+    );
+  }
+
+  /**
+   * Take everything that can run now. A held push stays requested, so it runs
+   * on the next call that does not hold it.
+   */
+  takePendingWork(options: { holdPush: boolean } = { holdPush: false }): PendingSyncWork {
     const work = {
-      push: this.pendingWork.push,
+      push: this.pendingWork.push && !options.holdPush,
       pullTargetCursor: this.pendingWork.pullTargetCursor,
     };
-    this.clear();
+    this.pendingWork.push = this.pendingWork.push && options.holdPush;
+    this.pendingWork.pullTargetCursor = null;
     return work;
   }
 
