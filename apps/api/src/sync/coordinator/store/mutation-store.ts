@@ -85,8 +85,13 @@ export class CoordinatorMutationStore {
 		} = {},
 	): Promise<CommitMutationsResult> {
 		const now = Date.now();
+		// Stale rejections are logged only once the transaction has committed.
+		// A later mutation in the same batch can still throw and roll the whole
+		// batch back, and then the client gets commit_mutations_failed instead,
+		// so logging from inside would report rejections it never received.
+		const staleRejections: StaleRevisionRejection[] = [];
 
-		return this.handle.db.transaction((tx) => {
+		const result = this.handle.db.transaction((tx) => {
 			const results: CommitMutationBatchResult[] = [];
 			let highestResponseCursor: number | null = null;
 			let highestBroadcastCursor: number | null = null;
@@ -221,6 +226,11 @@ export class CoordinatorMutationStore {
 				const currentRevision = Number(current?.revision ?? 0);
 				const expectedBaseRevision = Number(mutation.baseRevision);
 				if (currentRevision !== expectedBaseRevision) {
+					staleRejections.push({
+						entryId: mutation.entryId,
+						expectedBaseRevision: currentRevision,
+						receivedBaseRevision: expectedBaseRevision,
+					});
 					results.push({
 						status: "rejected",
 						mutationId,
@@ -393,6 +403,37 @@ export class CoordinatorMutationStore {
 				broadcastCursor: highestBroadcastCursor,
 			} satisfies CommitMutationsResult;
 		});
+
+		for (const rejection of staleRejections) {
+			logStaleRevision(session, rejection);
+		}
+		return result;
 	}
 
+}
+
+type StaleRevisionRejection = {
+	entryId: string;
+	expectedBaseRevision: number;
+	receivedBaseRevision: number;
+};
+
+/**
+ * Writes one JSON line per stale rejection so it can be read with
+ * `wrangler tail`. A client that keeps committing against a revision it never
+ * recorded shows up here as the same entry rejected over and over, with the
+ * two revisions saying how far behind it is. Only ids and revision numbers are
+ * logged: never encrypted metadata, paths or tokens.
+ */
+function logStaleRevision(session: SocketSession, rejection: StaleRevisionRejection): void {
+	console.warn(
+		JSON.stringify({
+			event: "stale_revision",
+			vaultId: session.vaultId,
+			localVaultId: session.localVaultId,
+			entryId: rejection.entryId,
+			expectedBaseRevision: rejection.expectedBaseRevision,
+			receivedBaseRevision: rejection.receivedBaseRevision,
+		}),
+	);
 }

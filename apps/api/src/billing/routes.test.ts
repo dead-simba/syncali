@@ -95,7 +95,7 @@ describe("billing routes", () => {
 function createTestApp(billingService = fakeBillingService()): Hono {
 	const app = new Hono();
 	registerBillingRoutes(app, {
-		auth: {} as Auth,
+		getAuth: () => ({}) as Auth,
 		billingService,
 	});
 	app.onError(onError);

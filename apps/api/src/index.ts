@@ -1,12 +1,12 @@
 import { logServerError } from "./errors";
-import { createQueueConsumer, createRuntimeApp } from "./runtime";
+import { createQueueConsumer, getRuntimeApp } from "./runtime";
 import type { QueueMessage } from "./runtime";
 export { SyncCoordinator } from "./sync-coordinator";
 
 export default {
 	async fetch(request, env): Promise<Response> {
 		try {
-			return await createRuntimeApp(env, request).fetch(request);
+			return await getRuntimeApp(env, request).fetch(request);
 		} catch (error) {
 			logServerError("fetch", error, request);
 			return Response.json(

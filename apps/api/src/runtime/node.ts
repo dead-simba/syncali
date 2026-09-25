@@ -134,7 +134,7 @@ export async function createNodeRuntime(config: NodeRuntimeConfig) {
 
 	const app = createApp(
 		{
-			auth,
+			getAuth: () => auth,
 			syncService,
 			vaultService,
 			syncTokenService,

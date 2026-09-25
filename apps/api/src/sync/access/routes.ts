@@ -1,16 +1,16 @@
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 
-import type { Auth } from "../../auth";
+import type { AuthProvider } from "../../auth";
 import type { SyncService } from "./service";
 import { Hono } from "hono";
 import { createEnsureAuthenticatedSession } from "../../middlewares/authenticated-session";
 
 export function registerSyncAccessRoutes(
 	app: Hono,
-	deps: { syncService: SyncService; auth: Auth },
+	deps: { syncService: SyncService; getAuth: AuthProvider },
 ): void {
-	const ensureAuthenticatedSession = createEnsureAuthenticatedSession(deps.auth);
+	const ensureAuthenticatedSession = createEnsureAuthenticatedSession(deps.getAuth);
 
 	app.post(
 		"/v1/sync/token",

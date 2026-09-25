@@ -65,6 +65,7 @@ export function createTestCoordinatorState(
 		readVersionHistoryRetentionDays: vi.fn(() => 1),
 		listEntryStates: vi.fn(() => []),
 		countEntryStates: vi.fn(() => 0),
+		readEntryStates: vi.fn(() => []),
 		listDeletedEntries: vi.fn(() => []),
 		readEntry: vi.fn(() => null),
 		listEntryVersions: vi.fn(() => []),

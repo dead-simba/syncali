@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 
-import type { Auth } from "../auth";
+import type { AuthProvider } from "../auth";
 import { apiError } from "../errors";
 import { createEnsureAuthenticatedSession } from "../middlewares/authenticated-session";
 import {
@@ -23,9 +23,9 @@ const portalRequestSchema = z.object({
 
 export function registerBillingRoutes(
 	app: Hono,
-	deps: { auth: Auth; billingService: BillingService },
+	deps: { getAuth: AuthProvider; billingService: BillingService },
 ): void {
-	const ensureAuthenticatedSession = createEnsureAuthenticatedSession(deps.auth);
+	const ensureAuthenticatedSession = createEnsureAuthenticatedSession(deps.getAuth);
 
 	app.post("/v1/billing/checkout", ensureAuthenticatedSession, async (c) => {
 		const user = c.var.user;

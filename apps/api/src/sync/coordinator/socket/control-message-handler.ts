@@ -3,8 +3,10 @@ import type {
 	CommitMutationsResult,
 	DeletedEntriesListedMessage,
 	DeletedEntriesPurgeResult,
+	EntryStatesByIdMessage,
 	EntryStatesListedMessage,
 	EntryVersionsListedMessage,
+	GetEntryStatesMessage,
 	ListDeletedEntriesMessage,
 	ListEntryStatesMessage,
 	ListEntryVersionsMessage,
@@ -16,6 +18,7 @@ import type {
 	SocketSession,
 } from "../types";
 import {
+	COORDINATOR_FEATURES,
 	formatClientControlMessageError,
 	parseClientControlMessage,
 } from "../protocol";
@@ -36,6 +39,10 @@ export type CoordinatorControlMessageUseCases = {
 		session: SocketSession,
 		message: ListEntryStatesMessage,
 	): EntryStatesListedMessage;
+	getEntryStates(
+		session: SocketSession,
+		message: GetEntryStatesMessage,
+	): EntryStatesByIdMessage;
 	listEntryVersions(
 		session: SocketSession,
 		message: ListEntryVersionsMessage,
@@ -108,6 +115,20 @@ export class CoordinatorControlMessageHandler
 			const decoded = JSON.parse(message) as unknown;
 			const result = parseClientControlMessage(decoded);
 			if (!result.success) {
+				const requestId = readGetEntryStatesRequestId(decoded);
+				if (requestId !== null) {
+					// Other malformed requests get a session_error, which carries no
+					// requestId. This lookup answers with its own failure instead, so
+					// the client can settle the request it is waiting on rather than
+					// wait for it to time out.
+					this.socketService.sendSocketMessage(ws, {
+						type: "entry_states_by_id_failed",
+						requestId,
+						code: "invalid_message",
+						message: formatClientControlMessageError(result.error),
+					});
+					return;
+				}
 				this.socketService.sendSocketMessage(ws, {
 					type: "session_error",
 					code: "invalid_message",
@@ -153,6 +174,7 @@ export class CoordinatorControlMessageHandler
 						maxFileSizeBytes: limits.maxFileSizeBytes,
 					},
 					storageStatus: this.healthStore.readStorageStatus(),
+					features: [...COORDINATOR_FEATURES],
 				});
 			} catch (error) {
 				this.socketService.sendSocketMessage(ws, {
@@ -199,6 +221,28 @@ export class CoordinatorControlMessageHandler
 				);
 				this.socketService.sendSocketMessage(ws, {
 					type: "entry_states_list_failed",
+					requestId: parsed.requestId,
+					code: details.code,
+					message: details.message,
+				});
+			}
+			return;
+		}
+
+		if (parsed.type === "get_entry_states") {
+			try {
+				this.socketService.sendSocketMessage(
+					ws,
+					this.useCases.getEntryStates(session, parsed),
+				);
+			} catch (error) {
+				const details = websocketRequestError(
+					error,
+					"entry_states_by_id_failed",
+					"entry states lookup failed",
+				);
+				this.socketService.sendSocketMessage(ws, {
+					type: "entry_states_by_id_failed",
 					requestId: parsed.requestId,
 					code: details.code,
 					message: details.message,
@@ -388,6 +432,22 @@ export class CoordinatorControlMessageHandler
 			});
 		}
 	}
+}
+
+function readGetEntryStatesRequestId(decoded: unknown): string | null {
+	if (
+		!decoded ||
+		typeof decoded !== "object" ||
+		!("type" in decoded) ||
+		decoded.type !== "get_entry_states" ||
+		!("requestId" in decoded) ||
+		typeof decoded.requestId !== "string" ||
+		!decoded.requestId.trim()
+	) {
+		return null;
+	}
+
+	return decoded.requestId;
 }
 
 function websocketRequestError(

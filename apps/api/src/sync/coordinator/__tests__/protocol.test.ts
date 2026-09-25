@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
 	formatClientControlMessageError,
+	MAX_ENTRY_STATES_BY_ID,
 	parseClientControlMessage,
 } from "../protocol";
 
@@ -86,6 +87,71 @@ describe("sync protocol schema", () => {
 			},
 			limit: 100,
 		});
+	});
+
+	it("accepts an entry-state lookup by id", () => {
+		const parsed = parseClientControlMessage({
+			type: "get_entry_states",
+			requestId: "request-entry-states-by-id",
+			entryIds: ["entry-1", "entry-2"],
+		});
+
+		expect(parsed.success).toBe(true);
+		if (!parsed.success) {
+			throw new Error("expected entry states by id message to parse");
+		}
+
+		expect(parsed.data).toEqual({
+			type: "get_entry_states",
+			requestId: "request-entry-states-by-id",
+			entryIds: ["entry-1", "entry-2"],
+		});
+	});
+
+	it("accepts an entry-state lookup of exactly the maximum batch", () => {
+		const parsed = parseClientControlMessage({
+			type: "get_entry_states",
+			requestId: "request-entry-states-by-id",
+			entryIds: Array.from({ length: MAX_ENTRY_STATES_BY_ID }, (_, i) => `entry-${i}`),
+		});
+
+		expect(parsed.success).toBe(true);
+	});
+
+	it.each([
+		{
+			name: "no ids",
+			entryIds: [],
+			error: "entryIds: Too small: expected array to have >=1 items",
+		},
+		{
+			name: "more ids than one batch allows",
+			entryIds: Array.from({ length: MAX_ENTRY_STATES_BY_ID + 1 }, (_, i) => `entry-${i}`),
+			error: "entryIds: Too big: expected array to have <=100 items",
+		},
+		{
+			name: "a blank id",
+			entryIds: ["entry-1", "  "],
+			error: "entryIds.1: Too small: expected string to have >=1 characters",
+		},
+		{
+			name: "a repeated id",
+			entryIds: ["entry-1", "entry-2", "entry-1"],
+			error: "entryIds: entry ids must be unique",
+		},
+	])("rejects an entry-state lookup with $name", ({ entryIds, error }) => {
+		const parsed = parseClientControlMessage({
+			type: "get_entry_states",
+			requestId: "request-entry-states-by-id",
+			entryIds,
+		});
+
+		expect(parsed.success).toBe(false);
+		if (parsed.success) {
+			throw new Error("expected entry states by id message to fail");
+		}
+
+		expect(formatClientControlMessageError(parsed.error)).toBe(error);
 	});
 
 	it("accepts an entry history request", () => {

@@ -1,5 +1,7 @@
 import { createApp } from "../app";
 import { createAuth } from "../auth";
+import { createEmailVerificationConfig } from "../auth/email";
+import type { AuthConfig } from "../auth/factory";
 import { readPolarProductIdsByPlanId } from "../billing/product-ids";
 import { BillingRepository } from "../billing/repository";
 import { createPolarAuthPlugin } from "../billing/polar";
@@ -42,9 +44,93 @@ type RuntimeEnv = Omit<
 	VAULT_PURGE_QUEUE?: Queue<VaultPurgeMessage>;
 };
 
-export function createRuntimeApp(env: RuntimeEnv, request: Request) {
+export type RuntimeApp = {
+	fetch(request: Request): Promise<Response>;
+};
+
+/**
+ * How many apps one isolate keeps per `env`. On a deploy that sets
+ * BETTER_AUTH_URL there is only ever one. Without it the key is the request
+ * origin, so a stream of requests with made-up Host headers could otherwise
+ * grow the cache without bound.
+ */
+const MAX_CACHED_RUNTIME_APPS_PER_ENV = 4;
+
+// workerd hands the same `env` object to every request an isolate serves (in
+// local workerd, five requests in a row all saw one object), so keying on it
+// gives one runtime per isolate. A WeakMap lets an env and the apps built from
+// it be collected if the runtime ever replaces it.
+const runtimeAppCache = new WeakMap<RuntimeEnv, Map<string, RuntimeApp>>();
+
+/**
+ * Returns the HTTP runtime for this env and request, building it at most once
+ * per isolate and auth base URL.
+ *
+ * Rebuilding it on every request measured 3-5 ms of CPU warm and about 25 ms
+ * cold, against a 10 ms per-request CPU limit on the Workers Free plan, so it
+ * spent up to half of every blob upload's budget before the upload started.
+ *
+ * The cache is keyed on the resolved auth base URL and not on env alone.
+ * Better Auth fixes `baseURL` when it is constructed, and on a self-hosted
+ * deploy without BETTER_AUTH_URL that URL comes from the request origin, so
+ * keying on env would lock every later request into the first one's origin.
+ *
+ * Sharing is safe because everything the runtime builds holds only bindings,
+ * secrets and configuration, never anything from the request that built it:
+ * repositories and services take bindings, Durable Object stubs are fetched
+ * per call, and Better Auth copies its context for each API call. Better
+ * Auth's context is a promise created during construction, but it settles
+ * without any I/O (its telemetry is off unless BETTER_AUTH_TELEMETRY is set),
+ * so later requests only ever await a promise that has already resolved (one
+ * that rejected is dropped, as described below). The one exception is Better
+ * Auth's `handler`, which writes `trustedOrigins` and `trustedProviders` onto
+ * its shared context on every call. That is harmless only because both are
+ * computed from `baseURL` and the configured `trustedOrigins`, which are
+ * fixed per cache key, so every request writes the same values. Anything
+ * request-scoped that is added to this runtime later has to be created
+ * inside a handler, not here.
+ *
+ * Only a runtime that finished building is cached. If construction throws,
+ * nothing is kept and the next request tries again. Better Auth is built
+ * lazily inside the runtime and follows the same rule, including when its
+ * setup fails after construction has returned (see `getAuth` below).
+ */
+export function getRuntimeApp(env: RuntimeEnv, request: Request): RuntimeApp {
+	const authBaseUrl = resolveAuthBaseUrl(env, request);
+	let apps = runtimeAppCache.get(env);
+	if (!apps) {
+		apps = new Map();
+		runtimeAppCache.set(env, apps);
+	}
+
+	const cached = apps.get(authBaseUrl);
+	if (cached) {
+		return cached;
+	}
+
+	const app = buildRuntimeApp(env, authBaseUrl);
+	if (apps.size >= MAX_CACHED_RUNTIME_APPS_PER_ENV) {
+		// Maps iterate in insertion order, so this drops the oldest entry.
+		const oldest = apps.keys().next();
+		if (!oldest.done) {
+			apps.delete(oldest.value);
+		}
+	}
+	apps.set(authBaseUrl, app);
+	return app;
+}
+
+/** Builds a fresh, uncached runtime. The Worker entry point uses `getRuntimeApp`. */
+export function createRuntimeApp(env: RuntimeEnv, request: Request): RuntimeApp {
+	return buildRuntimeApp(env, resolveAuthBaseUrl(env, request));
+}
+
+function resolveAuthBaseUrl(env: RuntimeEnv, request: Request): string {
 	const requestOrigin = new URL(request.url).origin;
-	const authBaseUrl = resolveUrlBinding("BETTER_AUTH_URL", env.BETTER_AUTH_URL, requestOrigin);
+	return resolveUrlBinding("BETTER_AUTH_URL", env.BETTER_AUTH_URL, requestOrigin);
+}
+
+function buildRuntimeApp(env: RuntimeEnv, authBaseUrl: string): RuntimeApp {
 	const publicOrigin = new URL(authBaseUrl).origin;
 	const devMode = resolveBooleanBinding(env.DEV_MODE, false);
 	const corsOrigin = devMode
@@ -64,31 +150,56 @@ export function createRuntimeApp(env: RuntimeEnv, request: Request) {
 	const subscriptionPolicyService = new SubscriptionPolicyService(env.SELF_HOSTED, db, {
 		productIdsByPlanId,
 	});
-	const polarAuthPlugin = env.SELF_HOSTED
-		? null
-		: createPolarAuthPlugin(polarConfig, billingRepository, {
-				onSubscriptionUpsert: async (organizationId) => {
-					const subscriptionPolicyRefreshQueue =
-						new CloudflareSubscriptionPolicyRefreshQueue(
-							requireBinding(env.POLICY_REFRESH_QUEUE, "POLICY_REFRESH_QUEUE"),
-						);
-					await subscriptionPolicyRefreshQueue.enqueueOrganizationPolicyRefresh(
-						organizationId,
-					);
-				},
-			});
-	const auth = createAuth(db, {
+	// Read before Better Auth is deferred below, so a deploy missing one of
+	// these still fails every request, as it did when everything was built up
+	// front, instead of only the ones that sign in: the allow list on a
+	// self-hosted deploy, and the managed deploy's email settings, which
+	// `createAuth` checks the same way.
+	const allowedEmails = env.SELF_HOSTED
+		? requireNonBlankStringBinding(env.AUTH_ALLOWED_EMAILS, "AUTH_ALLOWED_EMAILS")
+		: undefined;
+	const authConfig: AuthConfig = {
 		baseURL: authBaseUrl,
 		trustedOrigins: Array.from(new Set([publicOrigin, corsOrigin])),
 		selfHosted: env.SELF_HOSTED,
 		devMode,
 		email: env.EMAIL,
 		emailFrom: env.AUTH_EMAIL_FROM,
-		allowedEmails: env.SELF_HOSTED
-			? requireNonBlankStringBinding(env.AUTH_ALLOWED_EMAILS, "AUTH_ALLOWED_EMAILS")
-			: undefined,
-		plugins: polarAuthPlugin ? [polarAuthPlugin] : [],
-	});
+		allowedEmails,
+	};
+	createEmailVerificationConfig(authConfig);
+	// Better Auth and the Polar plugin are the most expensive part of this
+	// runtime, and blob and coordinator requests, which are most of the
+	// traffic, never touch them. Deferring them means an isolate that only
+	// serves uploads never builds them at all.
+	//
+	// `createAuth` returns before Better Auth has finished setting up: the
+	// rest runs in `$context`, which it does not await, and a bad secret or
+	// config rejects there rather than throwing. Watching `$context` lets
+	// such an instance be dropped like a build that threw, so the next
+	// request builds a new one instead of reusing one that can never work.
+	const getAuth = memoizeOnSuccess(
+		() => {
+			const polarAuthPlugin = env.SELF_HOSTED
+				? null
+				: createPolarAuthPlugin(polarConfig, billingRepository, {
+						onSubscriptionUpsert: async (organizationId) => {
+							const subscriptionPolicyRefreshQueue =
+								new CloudflareSubscriptionPolicyRefreshQueue(
+									requireBinding(env.POLICY_REFRESH_QUEUE, "POLICY_REFRESH_QUEUE"),
+								);
+							await subscriptionPolicyRefreshQueue.enqueueOrganizationPolicyRefresh(
+								organizationId,
+							);
+						},
+					});
+			return createAuth(db, {
+				...authConfig,
+				plugins: polarAuthPlugin ? [polarAuthPlugin] : [],
+			});
+		},
+		(auth) => auth.$context,
+	);
 	const blobRepository = new BlobRepository(env.SYNC_BLOBS);
 	const syncTokenService = new SyncTokenService(env.SYNC_TOKEN_SECRET);
 	const billingService = new BillingService(billingRepository, {
@@ -116,7 +227,7 @@ export function createRuntimeApp(env: RuntimeEnv, request: Request) {
 
 	const app = createApp(
 		{
-			auth,
+			getAuth,
 			syncService,
 			vaultService,
 			syncTokenService,
@@ -136,6 +247,39 @@ export function createRuntimeApp(env: RuntimeEnv, request: Request) {
 		async fetch(request: Request): Promise<Response> {
 			return await app.fetch(request);
 		},
+	};
+}
+
+/**
+ * Builds the value on first call and returns the same one afterwards. A build
+ * that throws is not remembered, so the next call tries again rather than
+ * failing forever on an error that may have been transient. The value is
+ * built synchronously, so no promise from one request is ever handed to
+ * another, which workerd would reject.
+ *
+ * Some values finish setting up after they are returned. `settled` names the
+ * promise that tells whether that worked, and if it rejects the value is
+ * forgotten the same way, so only the requests that already have it see the
+ * failure. The promise is only watched here, never returned to a caller.
+ */
+function memoizeOnSuccess<T>(
+	build: () => T,
+	settled?: (value: T) => Promise<unknown>,
+): () => T {
+	let built: { value: T } | null = null;
+	return () => {
+		if (!built) {
+			const current = { value: build() };
+			built = current;
+			settled?.(current.value).catch(() => {
+				// Checked by identity so a late rejection cannot drop a newer
+				// value that replaced this one.
+				if (built === current) {
+					built = null;
+				}
+			});
+		}
+		return built.value;
 	};
 }
 

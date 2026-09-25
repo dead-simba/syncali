@@ -80,6 +80,7 @@ export interface EntryStateStore {
 		limit: number,
 	): EntryStateRow[];
 	countEntryStates(sinceCursor: number, targetCursor: number): number;
+	readEntryStates(entryIds: readonly string[]): EntryStateRow[];
 	listDeletedEntries(
 		before: DeletedEntryPageCursor | null,
 		retentionStart: number,

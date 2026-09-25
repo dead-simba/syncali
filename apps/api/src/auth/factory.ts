@@ -129,3 +129,11 @@ export function createAuth(db: AppDb, config: AuthConfig) {
 }
 
 export type Auth = ReturnType<typeof createAuth>;
+
+/**
+ * Hands out the Better Auth instance on demand. Building it is the most
+ * expensive part of the HTTP runtime, and blob and coordinator requests never
+ * use it, so the Worker defers construction until a route actually needs a
+ * session (see `runtime/http.ts`).
+ */
+export type AuthProvider = () => Auth;

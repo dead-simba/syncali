@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { closeAllTestSqliteCoordinators, createSqliteCoordinator, testSession } from "./helpers";
 
@@ -119,6 +119,128 @@ describe("sqlite backend: mutation commits", () => {
 				receivedBaseRevision: 0,
 			},
 		]);
+	});
+
+	it("logs a stale rejection as one JSON line without metadata", async () => {
+		const { mutationStore } = await createSqliteCoordinator();
+		const session = testSession({ localVaultId: "local-vault-mac" });
+		const commit = (mutationId: string, baseRevision: number) =>
+			mutationStore.commitMutations(
+				session,
+				{
+					type: "commit_mutations",
+					requestId: `req-${mutationId}`,
+					mutations: [
+						{
+							mutationId,
+							entryId: "entry-1",
+							op: "upsert",
+							baseRevision,
+							blobId: null,
+							encryptedMetadata: "secret-ciphertext",
+						},
+					],
+				},
+				STAGE_GRACE_PERIOD_MS,
+				VERSION_HISTORY_RETENTION_MS,
+			);
+		await commit("mutation-1", 0);
+		await commit("mutation-2", 1);
+		const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+		try {
+			await commit("mutation-3", 1);
+
+			expect(warn).toHaveBeenCalledTimes(1);
+			const [line] = warn.mock.calls[0] ?? [];
+			expect(typeof line).toBe("string");
+			expect(JSON.parse(line as string)).toEqual({
+				event: "stale_revision",
+				vaultId: "vault-1",
+				localVaultId: "local-vault-mac",
+				entryId: "entry-1",
+				expectedBaseRevision: 2,
+				receivedBaseRevision: 1,
+			});
+			expect(line).not.toContain("secret-ciphertext");
+		} finally {
+			warn.mockRestore();
+		}
+	});
+
+	it("does not log an accepted commit", async () => {
+		const { mutationStore } = await createSqliteCoordinator();
+		const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+		try {
+			await mutationStore.commitMutations(
+				testSession(),
+				{
+					type: "commit_mutations",
+					requestId: "req-accepted",
+					mutations: [
+						{
+							mutationId: "mutation-1",
+							entryId: "entry-1",
+							op: "upsert",
+							baseRevision: 0,
+							blobId: null,
+							encryptedMetadata: "ciphertext",
+						},
+					],
+				},
+				STAGE_GRACE_PERIOD_MS,
+				VERSION_HISTORY_RETENTION_MS,
+			);
+
+			expect(warn).not.toHaveBeenCalled();
+		} finally {
+			warn.mockRestore();
+		}
+	});
+
+	it("does not log a stale rejection from a batch that rolled back", async () => {
+		const { mutationStore } = await createSqliteCoordinator();
+		const mutation = (mutationId: string, entryId: string) => ({
+			mutationId,
+			entryId,
+			op: "upsert" as const,
+			baseRevision: 0,
+			blobId: null,
+			encryptedMetadata: "ciphertext",
+		});
+		await mutationStore.commitMutations(
+			testSession(),
+			{
+				type: "commit_mutations",
+				requestId: "req-first",
+				mutations: [mutation("mutation-1", "entry-1")],
+			},
+			STAGE_GRACE_PERIOD_MS,
+			VERSION_HISTORY_RETENTION_MS,
+		);
+		const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+		try {
+			// The first mutation is stale. The second needs a cursor, and a
+			// session for another vault makes allocating one throw, which rolls
+			// the batch back before the client is told about either.
+			const commit = mutationStore.commitMutations(
+				testSession({ vaultId: "vault-other" }),
+				{
+					type: "commit_mutations",
+					requestId: "req-rolled-back",
+					mutations: [mutation("mutation-2", "entry-1"), mutation("mutation-3", "entry-2")],
+				},
+				STAGE_GRACE_PERIOD_MS,
+				VERSION_HISTORY_RETENTION_MS,
+			);
+
+			await expect(commit).rejects.toThrow("durable object vault id mismatch");
+			expect(warn).not.toHaveBeenCalled();
+		} finally {
+			warn.mockRestore();
+		}
 	});
 
 	it("replays an already-applied mutation id idempotently", async () => {

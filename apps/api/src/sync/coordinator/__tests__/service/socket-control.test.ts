@@ -307,6 +307,7 @@ describe("coordinator websocket control messages", () => {
 				storageUsedBytes: 24_300_000,
 				storageLimitBytes: 100_000_000,
 			},
+			features: ["get_entry_states"],
 		});
 		expect(stateRepository.recordLocalVaultConnection).toHaveBeenCalledWith(
 			"user-1",

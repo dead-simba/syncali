@@ -10,6 +10,16 @@ import type {
 } from "../types";
 import type { CoordinatorStorageHandle } from "./storage-handle";
 
+type EntryStateSqlRow = {
+	entry_id: string;
+	revision: number;
+	blob_id: string | null;
+	encrypted_metadata: string;
+	deleted: number;
+	updated_seq: number;
+	updated_at: number;
+};
+
 export class CoordinatorEntryStore {
 	constructor(private readonly handle: CoordinatorStorageHandle) {}
 
@@ -20,15 +30,7 @@ export class CoordinatorEntryStore {
 		limit: number,
 	): EntryStateRow[] {
 		const rows = this.handle
-			.exec<{
-				entry_id: string;
-				revision: number;
-				blob_id: string | null;
-				encrypted_metadata: string;
-				deleted: number;
-				updated_seq: number;
-				updated_at: number;
-			}>(
+			.exec<EntryStateSqlRow>(
 				`
 				SELECT
 					entry_id,
@@ -59,15 +61,37 @@ export class CoordinatorEntryStore {
 			)
 			.toArray();
 
-		return rows.map((row) => ({
-			entry_id: row.entry_id,
-			revision: Number(row.revision),
-			blob_id: row.blob_id,
-			encrypted_metadata: row.encrypted_metadata,
-			deleted: Number(row.deleted) !== 0,
-			updated_seq: Number(row.updated_seq),
-			updated_at: Number(row.updated_at),
-		}));
+		return rows.map(toEntryStateRow);
+	}
+
+	readEntryStates(entryIds: readonly string[]): EntryStateRow[] {
+		if (entryIds.length === 0) {
+			return [];
+		}
+
+		// The ids travel as one JSON parameter instead of one placeholder each.
+		// Durable Object SQLite caps a statement at 100 bound parameters, which
+		// a full batch would sit exactly on, and one fixed statement avoids
+		// building SQL from the request.
+		const rows = this.handle
+			.exec<EntryStateSqlRow>(
+				`
+				SELECT
+					entry_id,
+					revision,
+					blob_id,
+					encrypted_metadata,
+					deleted,
+					updated_seq,
+					updated_at
+				FROM entries
+				WHERE entry_id IN (SELECT value FROM json_each(?))
+				`,
+				JSON.stringify(entryIds),
+			)
+			.toArray();
+
+		return rows.map(toEntryStateRow);
 	}
 
 	countEntryStates(sinceCursor: number, targetCursor: number): number {
@@ -166,4 +190,16 @@ export class CoordinatorEntryStore {
 			: null;
 	}
 
+}
+
+function toEntryStateRow(row: EntryStateSqlRow): EntryStateRow {
+	return {
+		entry_id: row.entry_id,
+		revision: Number(row.revision),
+		blob_id: row.blob_id,
+		encrypted_metadata: row.encrypted_metadata,
+		deleted: Number(row.deleted) !== 0,
+		updated_seq: Number(row.updated_seq),
+		updated_at: Number(row.updated_at),
+	};
 }

@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 
-import { registerAuthRoutes, type Auth } from "./auth";
+import { registerAuthRoutes, type AuthProvider } from "./auth";
 import { registerBillingRoutes } from "./billing/routes";
 import type { BillingService } from "./billing/service";
 import { onError } from "./errors";
@@ -19,7 +19,7 @@ import { registerVaultRoutes } from "./vault/routes";
 import type { VaultService } from "./vault/service";
 
 export type AppDependencies = {
-	auth: Auth;
+	getAuth: AuthProvider;
 	syncService: SyncService;
 	syncTokenService: SyncTokenService;
 	blobRepository: BlobStorage;
@@ -48,7 +48,7 @@ export function createApp(deps: AppDependencies, config: AppConfig): Hono {
 		}),
 	);
 
-	registerAuthRoutes(app, deps.auth);
+	registerAuthRoutes(app, deps.getAuth);
 	registerHealthRoutes(app);
 	registerPluginVersionRoutes(app);
 	registerSyncAccessRoutes(app, deps);

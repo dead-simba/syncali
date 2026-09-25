@@ -1,9 +1,13 @@
+import type { CoordinatorFeature } from "./protocol";
+
 export type {
 	ClientControlMessage,
 	CommitMutationMessage,
 	CommitMutationPayload,
 	CommitMutationsMessage,
+	CoordinatorFeature,
 	DetachLocalVaultMessage,
+	GetEntryStatesMessage,
 	HeartbeatMessage,
 	HelloMessage,
 	ListDeletedEntriesMessage,
@@ -22,6 +26,8 @@ export type HelloAckMessage = {
 	cursor: number;
 	policy: VaultPolicySnapshot;
 	storageStatus: StorageStatusSnapshot;
+	/** Optional server capabilities. Older servers omit it, which means none. */
+	features?: CoordinatorFeature[];
 };
 
 export type VaultPolicySnapshot = {
@@ -123,6 +129,16 @@ export type EntryStatePageCursor = {
 	entryId: string;
 };
 
+export type EntryStateSnapshot = {
+	entryId: string;
+	revision: number;
+	blobId: string | null;
+	encryptedMetadata: string;
+	deleted: boolean;
+	updatedSeq: number;
+	updatedAt: number;
+};
+
 export type EntryStatesListedMessage = {
 	type: "entry_states_listed";
 	requestId: string;
@@ -130,15 +146,21 @@ export type EntryStatesListedMessage = {
 	totalEntries: number;
 	hasMore: boolean;
 	nextAfter: EntryStatePageCursor | null;
-	entries: Array<{
-		entryId: string;
-		revision: number;
-		blobId: string | null;
-		encryptedMetadata: string;
-		deleted: boolean;
-		updatedSeq: number;
-		updatedAt: number;
-	}>;
+	entries: EntryStateSnapshot[];
+};
+
+export type EntryStatesByIdMessage = {
+	type: "entry_states_by_id";
+	requestId: string;
+	/** Ids the server has no entry for are left out rather than reported as errors. */
+	entries: EntryStateSnapshot[];
+};
+
+export type EntryStatesByIdFailedMessage = {
+	type: "entry_states_by_id_failed";
+	requestId: string;
+	code: string;
+	message: string;
 };
 
 export type EntryStatesListFailedMessage = {
@@ -290,6 +312,8 @@ export type ServerControlMessage =
 	| CommitMutationsFailedMessage
 	| EntryStatesListedMessage
 	| EntryStatesListFailedMessage
+	| EntryStatesByIdMessage
+	| EntryStatesByIdFailedMessage
 	| EntryVersionsListedMessage
 	| EntryVersionsListFailedMessage
 	| DeletedEntriesListedMessage

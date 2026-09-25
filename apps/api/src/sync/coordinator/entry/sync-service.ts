@@ -1,5 +1,9 @@
 import type {
+	EntryStateRow,
+	EntryStateSnapshot,
+	EntryStatesByIdMessage,
 	EntryStatesListedMessage,
+	GetEntryStatesMessage,
 	ListEntryStatesMessage,
 	SocketSession,
 } from "../types";
@@ -51,17 +55,43 @@ export class EntrySyncService {
 							entryId: last.entry_id,
 						}
 					: null,
-			entries: page.map((entry) => ({
-				entryId: entry.entry_id,
-				revision: entry.revision,
-				blobId: entry.blob_id,
-				encryptedMetadata: entry.encrypted_metadata,
-				deleted: entry.deleted,
-				updatedSeq: entry.updated_seq,
-				updatedAt: entry.updated_at,
-			})),
+			entries: page.map(toEntryStateSnapshot),
 		};
 	}
+
+	getEntryStates(
+		_session: SocketSession,
+		message: GetEntryStatesMessage,
+	): EntryStatesByIdMessage {
+		const rowsById = new Map(
+			this.entryStore
+				.readEntryStates(message.entryIds)
+				.map((row) => [row.entry_id, row]),
+		);
+
+		return {
+			type: "entry_states_by_id",
+			requestId: message.requestId,
+			// Answered in the order the client asked, so a response reads the same
+			// way however SQLite happened to return the rows.
+			entries: message.entryIds.flatMap((entryId) => {
+				const row = rowsById.get(entryId);
+				return row ? [toEntryStateSnapshot(row)] : [];
+			}),
+		};
+	}
+}
+
+function toEntryStateSnapshot(entry: EntryStateRow): EntryStateSnapshot {
+	return {
+		entryId: entry.entry_id,
+		revision: entry.revision,
+		blobId: entry.blob_id,
+		encryptedMetadata: entry.encrypted_metadata,
+		deleted: entry.deleted,
+		updatedSeq: entry.updated_seq,
+		updatedAt: entry.updated_at,
+	};
 }
 
 function validateCursorRange(

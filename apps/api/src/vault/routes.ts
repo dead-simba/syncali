@@ -1,7 +1,7 @@
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 
-import type { Auth } from "../auth";
+import type { AuthProvider } from "../auth";
 import { createEnsureAuthenticatedSession } from "../middlewares/authenticated-session";
 import type { VaultService } from "./service";
 import { Hono } from "hono";
@@ -56,9 +56,9 @@ const vaultKeyEnvelopeSchema = z.object({
 
 export function registerVaultRoutes(
 	app: Hono,
-	deps: { vaultService: VaultService; auth: Auth },
+	deps: { vaultService: VaultService; getAuth: AuthProvider },
 ): void {
-	const ensureAuthenticatedSession = createEnsureAuthenticatedSession(deps.auth);
+	const ensureAuthenticatedSession = createEnsureAuthenticatedSession(deps.getAuth);
 
 	app.get("/v1/vaults", ensureAuthenticatedSession, async (c) => {
 		const user = c.var.user;

@@ -64,6 +64,36 @@ export const listEntryStatesMessageSchema = z.object({
 	limit: positiveInteger,
 });
 
+/**
+ * Optional capabilities this server advertises in `hello_ack.features`. A
+ * client may only send a message listed here: a server that predates it
+ * answers with a `session_error` that carries no requestId, which the client
+ * cannot tie back to the request it was waiting on.
+ */
+export const COORDINATOR_FEATURES = ["get_entry_states"] as const;
+
+export const MAX_ENTRY_STATES_BY_ID = 100;
+
+/**
+ * Looks entries up by id rather than by cursor. A client needs this when it
+ * holds a local change for an entry whose newer server revision it never
+ * recorded, for example because its cursor already moved past that revision.
+ * Paging by cursor never returns such an entry again, so without a direct
+ * lookup the client keeps committing against a revision the server has left
+ * behind.
+ */
+export const getEntryStatesMessageSchema = z.object({
+	type: z.literal("get_entry_states"),
+	requestId: requestIdSchema,
+	entryIds: z
+		.array(nonEmptyString)
+		.min(1)
+		.max(MAX_ENTRY_STATES_BY_ID)
+		.refine((entryIds) => new Set(entryIds).size === entryIds.length, {
+			message: "entry ids must be unique",
+		}),
+});
+
 const entryVersionPageCursorSchema = z.object({
 	capturedAt: nonNegativeInteger,
 	versionId: nonEmptyString,
@@ -144,6 +174,7 @@ export const clientControlMessageSchema = z.discriminatedUnion("type", [
 	helloMessageSchema,
 	commitMutationsMessageSchema,
 	listEntryStatesMessageSchema,
+	getEntryStatesMessageSchema,
 	listEntryVersionsMessageSchema,
 	listDeletedEntriesMessageSchema,
 	restoreEntryVersionMessageSchema,
@@ -160,6 +191,8 @@ export type CommitMutationPayload = z.infer<typeof commitMutationPayloadSchema>;
 export type CommitMutationMessage = z.infer<typeof commitMutationMessageSchema>;
 export type CommitMutationsMessage = z.infer<typeof commitMutationsMessageSchema>;
 export type ListEntryStatesMessage = z.infer<typeof listEntryStatesMessageSchema>;
+export type GetEntryStatesMessage = z.infer<typeof getEntryStatesMessageSchema>;
+export type CoordinatorFeature = (typeof COORDINATOR_FEATURES)[number];
 export type ListEntryVersionsMessage = z.infer<typeof listEntryVersionsMessageSchema>;
 export type ListDeletedEntriesMessage = z.infer<typeof listDeletedEntriesMessageSchema>;
 export type RestoreEntryVersionMessage = z.infer<typeof restoreEntryVersionMessageSchema>;

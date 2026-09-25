@@ -6,7 +6,9 @@ import type {
 	DeletedEntriesListedMessage,
 	DeletedEntriesPurgeResult,
 	EntryStatesListedMessage,
+	EntryStatesByIdMessage,
 	EntryVersionsListedMessage,
+	GetEntryStatesMessage,
 	ListDeletedEntriesMessage,
 	ListEntryStatesMessage,
 	ListEntryVersionsMessage,
@@ -71,6 +73,10 @@ export interface EntrySyncUseCases {
 		session: SocketSession,
 		message: ListEntryStatesMessage,
 	): EntryStatesListedMessage;
+	getEntryStates(
+		session: SocketSession,
+		message: GetEntryStatesMessage,
+	): EntryStatesByIdMessage;
 }
 
 export interface HealthUseCases {
@@ -133,6 +139,13 @@ export class CoordinatorService {
 		message: ListEntryStatesMessage,
 	): EntryStatesListedMessage {
 		return this.services.entrySyncService.listEntryStates(session, message);
+	}
+
+	getEntryStates(
+		session: SocketSession,
+		message: GetEntryStatesMessage,
+	): EntryStatesByIdMessage {
+		return this.services.entrySyncService.getEntryStates(session, message);
 	}
 
 	async detachLocalVault(session: SocketSession): Promise<void> {
@@ -255,6 +268,7 @@ export type CoordinatorDurableObjectUseCases = Pick<
 	| "commitMutations"
 	| "commitMutation"
 	| "listEntryStates"
+	| "getEntryStates"
 	| "listEntryVersions"
 	| "listDeletedEntries"
 	| "restoreEntryVersion"

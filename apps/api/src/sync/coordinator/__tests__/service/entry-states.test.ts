@@ -1,11 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 
+import type { EntryStateRow } from "../../types";
 import {
 	createCoordinatorService,
 	createMockCoordinatorSocketService,
 	createTestCoordinatorState,
 	testSocketSession,
 	testWebSocket,
+	type TestCoordinatorState,
 } from "./helpers";
 
 describe("coordinator entry-state sync", () => {
@@ -122,5 +124,138 @@ describe("coordinator entry-state sync", () => {
 			}),
 		);
 		expect(listEntryStates).not.toHaveBeenCalled();
+	});
+});
+
+describe("coordinator entry-state lookup by id", () => {
+	function entryRow(entryId: string, overrides: Partial<EntryStateRow> = {}): EntryStateRow {
+		return {
+			entry_id: entryId,
+			revision: 3,
+			blob_id: `blob-${entryId}`,
+			encrypted_metadata: `metadata-${entryId}`,
+			deleted: false,
+			updated_seq: 9,
+			updated_at: 456,
+			...overrides,
+		};
+	}
+
+	function setup(readEntryStates: TestCoordinatorState["readEntryStates"]) {
+		const sender = testWebSocket();
+		const socketService = createMockCoordinatorSocketService({
+			readSocketSession: vi.fn(() => testSocketSession()),
+			sendSocketMessage: vi.fn(),
+		});
+		const stateRepository = createTestCoordinatorState({ readEntryStates });
+		const service = createCoordinatorService({ stateRepository, socketService });
+		return { sender, socketService, stateRepository, service };
+	}
+
+	it("advertises the lookup in the hello acknowledgement", async () => {
+		const { sender, socketService, service } = setup(vi.fn(() => []));
+
+		await service.handleSocketMessage(
+			sender,
+			JSON.stringify({ type: "hello", requestId: "request-hello", lastKnownCursor: 0 }),
+		);
+
+		expect(socketService.sendSocketMessage).toHaveBeenCalledWith(
+			sender,
+			expect.objectContaining({
+				type: "hello_ack",
+				features: expect.arrayContaining(["get_entry_states"]),
+			}),
+		);
+	});
+
+	it("returns the requested entries in request order and leaves out unknown ids", async () => {
+		const readEntryStates = vi.fn(() => [
+			entryRow("entry-2", { deleted: true, blob_id: null, revision: 5 }),
+			entryRow("entry-1"),
+		]);
+		const { sender, socketService, service } = setup(readEntryStates);
+
+		await service.handleSocketMessage(
+			sender,
+			JSON.stringify({
+				type: "get_entry_states",
+				requestId: "request-by-id",
+				entryIds: ["entry-1", "entry-missing", "entry-2"],
+			}),
+		);
+
+		expect(readEntryStates).toHaveBeenCalledWith(["entry-1", "entry-missing", "entry-2"]);
+		expect(socketService.sendSocketMessage).toHaveBeenCalledWith(sender, {
+			type: "entry_states_by_id",
+			requestId: "request-by-id",
+			entries: [
+				{
+					entryId: "entry-1",
+					revision: 3,
+					blobId: "blob-entry-1",
+					encryptedMetadata: "metadata-entry-1",
+					deleted: false,
+					updatedSeq: 9,
+					updatedAt: 456,
+				},
+				{
+					entryId: "entry-2",
+					revision: 5,
+					blobId: null,
+					encryptedMetadata: "metadata-entry-2",
+					deleted: true,
+					updatedSeq: 9,
+					updatedAt: 456,
+				},
+			],
+		});
+	});
+
+	it("answers an over-limit lookup with a failure the client can match to its request", async () => {
+		const readEntryStates = vi.fn(() => []);
+		const { sender, socketService, service } = setup(readEntryStates);
+
+		await service.handleSocketMessage(
+			sender,
+			JSON.stringify({
+				type: "get_entry_states",
+				requestId: "request-too-many",
+				entryIds: Array.from({ length: 101 }, (_, i) => `entry-${i}`),
+			}),
+		);
+
+		expect(socketService.sendSocketMessage).toHaveBeenCalledTimes(1);
+		expect(socketService.sendSocketMessage).toHaveBeenCalledWith(sender, {
+			type: "entry_states_by_id_failed",
+			requestId: "request-too-many",
+			code: "invalid_message",
+			message: "entryIds: Too big: expected array to have <=100 items",
+		});
+		expect(readEntryStates).not.toHaveBeenCalled();
+	});
+
+	it("reports a storage failure against the request that caused it", async () => {
+		const { sender, socketService, service } = setup(
+			vi.fn(() => {
+				throw new Error("sqlite is unavailable");
+			}),
+		);
+
+		await service.handleSocketMessage(
+			sender,
+			JSON.stringify({
+				type: "get_entry_states",
+				requestId: "request-by-id",
+				entryIds: ["entry-1"],
+			}),
+		);
+
+		expect(socketService.sendSocketMessage).toHaveBeenCalledWith(sender, {
+			type: "entry_states_by_id_failed",
+			requestId: "request-by-id",
+			code: "entry_states_by_id_failed",
+			message: "sqlite is unavailable",
+		});
 	});
 });

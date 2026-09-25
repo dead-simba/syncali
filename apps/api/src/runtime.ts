@@ -1,5 +1,5 @@
 export { createCoordinatorRuntime } from "./runtime/coordinator";
-export { createRuntimeApp } from "./runtime/http";
+export { createRuntimeApp, getRuntimeApp } from "./runtime/http";
 export { createQueueConsumer } from "./runtime/queue";
 export type {
 	QueueMessage,
