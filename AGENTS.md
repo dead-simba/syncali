@@ -30,6 +30,10 @@ about the code.** Before proposing a cause, produce a number that only that
 cause explains. Every confident theory in this project's history that was not
 backed by a measurement turned out to be wrong.
 
+The first measurement to take is `pnpm sync:doctor`: every device's own
+report of how it is syncing, judged the same way the plugin's Devices view
+judges it (`docs/device-reports.md`).
+
 ## User-Facing Copy
 
 All user-visible text - website, auth pages, plugin notices, error messages,
@@ -58,4 +62,6 @@ pnpm -C apps/obsidian-plugin typecheck
 pnpm -C apps/obsidian-plugin build
 
 pnpm -C apps/www build
+
+pnpm sync:doctor
 ```

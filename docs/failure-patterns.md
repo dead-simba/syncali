@@ -23,6 +23,7 @@ Where the numbers live:
 
 | Question | How to answer it |
 | --- | --- |
+| How is every device syncing, right now? | `pnpm sync:doctor` from the repo root - start here. It reads each device's report, the server's counters, and the decrypted copies on this computer. See `docs/device-reports.md` |
 | Is anything actually being sent? | `npx wrangler tail` in `apps/api`, count requests per minute |
 | Is the server accepting commits? | D1 `vault_sync_status`: `staged_blob_count`, `live_blob_count`, `entry_count`, `last_commit_at` (flushed periodically, so it lags) |
 | What does the client think it holds? | `strings` over `~/Library/Application Support/obsidian/IndexedDB/app_obsidian.md_0.indexeddb.leveldb/*.log` — entry rows are readable text |
