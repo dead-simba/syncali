@@ -3,7 +3,7 @@ import { Notice, type Plugin, TFolder } from "obsidian";
 import { BillingClient } from "../billing/client";
 import { buildBillingWebPageUrl } from "../billing/web-url";
 import { getServerDeployment } from "../config";
-import { isOfflineLikeError } from "../http/network-status";
+import { isConnectionDropError } from "../http/network-status";
 import {
   formatErrorNotice,
   getSynchLocale,
@@ -855,7 +855,7 @@ export class SynchPluginController implements SynchSettingsController {
       return;
     }
 
-    if (isOfflineLikeError(error)) {
+    if (isConnectionDropError(error)) {
       this.syncController.markOffline();
       return;
     }

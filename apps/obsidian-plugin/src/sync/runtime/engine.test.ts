@@ -46,6 +46,58 @@ describe("SyncEngine", () => {
     await store.close();
   });
 
+  it.each([
+    "net::ERR_CONNECTION_RESET",
+    "net::ERR_NETWORK_CHANGED",
+    "net::ERR_NAME_NOT_RESOLVED",
+    "net::ERR_QUIC_PROTOCOL_ERROR",
+  ])("reports a dropped connection in Chromium's words (%s) as offline, without a notice", async (message) => {
+    // 66 of 82 problems recorded on two desktop vaults were these, each one a
+    // notice reading "Automatic sync failed: net::ERR_...".
+    const plugin = createPlugin({}, async () => encodeUtf8("body"));
+    const store = await createInitializedTestSyncStore(plugin);
+    const setSyncStatus = vi.fn();
+    const notifyError = vi.fn();
+    const engine = createEngine(plugin, {
+      getSyncToken: async () => {
+        throw new Error(message);
+      },
+      setSyncStatus,
+      notifyError,
+    });
+    engine.setStore(store);
+
+    await engine.startAutoSync();
+
+    expect(setSyncStatus).toHaveBeenCalledWith("offline");
+    expect(notifyError).not.toHaveBeenCalled();
+    engine.stopAutoSync();
+    await store.close();
+  });
+
+  it("still tells the user when the server itself fails", async () => {
+    const plugin = createPlugin({}, async () => encodeUtf8("body"));
+    const store = await createInitializedTestSyncStore(plugin);
+    const setSyncStatus = vi.fn();
+    const notifyError = vi.fn();
+    const engine = createEngine(plugin, {
+      getSyncToken: async () => {
+        throw Object.assign(new Error("error code: 1102"), { status: 503, code: "http_503" });
+      },
+      setSyncStatus,
+      notifyError,
+    });
+    engine.setStore(store);
+
+    await engine.startAutoSync();
+
+    expect(setSyncStatus).toHaveBeenCalledWith("attention_needed");
+    expect(notifyError).toHaveBeenCalledTimes(1);
+    expect(notifyError.mock.calls[0]?.[1]).toBe("error.autoSync");
+    engine.stopAutoSync();
+    await store.close();
+  });
+
   it("lists file-size blocked files with decrypted paths and size metadata", async () => {
     const plugin = createPlugin({}, async () => encodeUtf8("body"));
     const store = await createInitializedTestSyncStore(plugin);

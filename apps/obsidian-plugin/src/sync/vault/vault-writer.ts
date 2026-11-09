@@ -14,10 +14,85 @@ export class VaultWriteError extends Error {
     readonly operation: string,
     readonly path: string,
     readonly cause: unknown,
+    /**
+     * The name the operation was creating. Usually `path`; for a rename it is
+     * the destination, because `path` then reads `old" -> "new` for display.
+     */
+    readonly createdPath: string = path,
   ) {
     super(`${operation} failed for "${path}": ${describeCause(cause)}`);
     this.name = "VaultWriteError";
   }
+}
+
+/**
+ * Characters Android will not accept in a file or folder name. Obsidian's
+ * mobile adapter reports the refusal as a bare `FILE_NOTCREATED`.
+ */
+const ANDROID_FORBIDDEN_NAME_CHARACTERS = ['"', "*", ":", "<", ">", "?", "\\", "|"];
+
+const ANDROID_NAME_REFUSED_CODE = "FILE_NOTCREATED";
+
+/** The operations that bring a name into being, and so can be refused one. */
+const NAME_CREATING_OPERATIONS = new Set(["write", "create folder", "rename"]);
+
+export interface PlatformRefusedName {
+  /** The file or folder that could not be created. */
+  path: string;
+  /** Which of its characters the platform does not allow, in a stable order. */
+  characters: string[];
+}
+
+/**
+ * Whether a vault write failed because this device does not allow a character
+ * in the name, and if so which name and which characters.
+ *
+ * Only answers when both halves are visible - Android's refusal code and a
+ * character Android refuses - so a FILE_NOTCREATED from a full disk or a
+ * permission problem is never blamed on the name. Looks through `cause` too,
+ * since callers may wrap the error on its way to the notice.
+ */
+export function platformRefusedName(error: unknown): PlatformRefusedName | null {
+  const writeError = findVaultWriteError(error);
+  if (
+    !writeError ||
+    !NAME_CREATING_OPERATIONS.has(writeError.operation) ||
+    !causeMentions(writeError.cause, ANDROID_NAME_REFUSED_CODE)
+  ) {
+    return null;
+  }
+
+  const characters = ANDROID_FORBIDDEN_NAME_CHARACTERS.filter((character) =>
+    writeError.createdPath.includes(character),
+  );
+  return characters.length > 0 ? { path: writeError.createdPath, characters } : null;
+}
+
+function findVaultWriteError(error: unknown): VaultWriteError | null {
+  let current: unknown = error;
+  for (let depth = 0; depth < 5 && current; depth += 1) {
+    if (current instanceof VaultWriteError) {
+      return current;
+    }
+    current = current instanceof Error ? (current as { cause?: unknown }).cause : null;
+  }
+  return null;
+}
+
+// Read as fields rather than `instanceof Error`: a platform plugin's rejection
+// is not always a real Error, but it carries `message` and `code` either way.
+function causeMentions(cause: unknown, text: string): boolean {
+  if (typeof cause === "string") {
+    return cause.includes(text);
+  }
+  if (!cause || typeof cause !== "object") {
+    return false;
+  }
+  const { message, code } = cause as { message?: unknown; code?: unknown };
+  return (
+    (typeof message === "string" && message.includes(text)) ||
+    (typeof code === "string" && code.includes(text))
+  );
 }
 
 function describeCause(cause: unknown): string {
@@ -36,13 +111,14 @@ async function withPathContext<T>(
   operation: string,
   path: string,
   run: () => Promise<T>,
+  createdPath: string = path,
 ): Promise<T> {
   try {
     return await run();
   } catch (error) {
     throw error instanceof VaultWriteError
       ? error
-      : new VaultWriteError(operation, path, error);
+      : new VaultWriteError(operation, path, error, createdPath);
   }
 }
 
@@ -117,9 +193,14 @@ export async function renameVaultPath(
   assertWritableVaultPath(writer, oldPath);
   assertWritableVaultPath(writer, newPath);
   await ensureParentDirectories(writer, newPath);
-  await withPathContext("rename", `${oldPath}" -> "${newPath}`, async () => {
-    await writer.rename(oldPath, newPath);
-  });
+  await withPathContext(
+    "rename",
+    `${oldPath}" -> "${newPath}`,
+    async () => {
+      await writer.rename(oldPath, newPath);
+    },
+    newPath,
+  );
 }
 
 export async function removeVaultPathIfExists(

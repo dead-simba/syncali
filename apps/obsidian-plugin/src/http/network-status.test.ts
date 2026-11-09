@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { ApiRequestError } from "./request";
-import { isOfflineLikeError, isTransientSyncError } from "./network-status";
+import {
+  isConnectionDropError,
+  isOfflineLikeError,
+  isServerUnavailableError,
+  isTransientSyncError,
+} from "./network-status";
 
 const online = () => false;
 
@@ -42,6 +47,91 @@ describe("offline-like error detection", () => {
 
   it("reports offline whenever the device says it is offline", () => {
     expect(isOfflineLikeError(new Error("anything"), () => true)).toBe(true);
+  });
+
+});
+
+describe("connection drop detection", () => {
+  // Every Chromium code in two desktop vaults' Recent problems, 66 of 82
+  // entries. Each one popped "Automatic sync failed" over a dropped link that
+  // the next pass retried anyway.
+  it.each([
+    "net::ERR_CONNECTION_RESET",
+    "net::ERR_NETWORK_CHANGED",
+    "net::ERR_NAME_NOT_RESOLVED",
+    "net::ERR_QUIC_PROTOCOL_ERROR",
+    "net::ERR_CONNECTION_TIMED_OUT",
+    "net::ERR_TIMED_OUT",
+    "net::ERR_ADDRESS_UNREACHABLE",
+    "net::ERR_NETWORK_IO_SUSPENDED",
+    "net::ERR_INTERNET_DISCONNECTED",
+  ])("shows Chromium's %s as offline, not as a sync failure", (message) => {
+    expect(isConnectionDropError(new Error(message), online)).toBe(true);
+  });
+
+  it.each([
+    "net::ERR_CONNECTION_RESET",
+    "net::ERR_NETWORK_CHANGED",
+    "net::ERR_QUIC_PROTOCOL_ERROR",
+  ])("does not make the push abandon its batch over %s", (message) => {
+    // An offline-like error aborts the whole push. A file that hits the same
+    // reset on every attempt has to be counted and set aside instead, or it
+    // blocks everything queued behind it behind an "offline" status.
+    expect(isOfflineLikeError(new Error(message), online)).toBe(false);
+  });
+
+  it("keeps Chromium errors the user has to fix visible", () => {
+    expect(isConnectionDropError(new Error("net::ERR_CERT_AUTHORITY_INVALID"), online)).toBe(
+      false,
+    );
+    expect(isConnectionDropError(new Error("net::ERR_PROXY_CONNECTION_FAILED"), online)).toBe(
+      false,
+    );
+  });
+
+  it("covers everything that already counts as offline", () => {
+    expect(isConnectionDropError(new Error("Connection reset by peer"), online)).toBe(true);
+    expect(isConnectionDropError(new Error("anything"), () => true)).toBe(true);
+  });
+});
+
+describe("vault write errors", () => {
+  function vaultWriteError(path: string) {
+    return Object.assign(new Error(`write failed for "${path}": FILE_NOTCREATED`), {
+      name: "VaultWriteError",
+    });
+  }
+
+  it.each([
+    "Offline maps/Trip?.md",
+    "Internet Archive/Why?.md",
+    "Notes/Why the build timed out?.md",
+    "Ops/Gateway timeout runbook?.md",
+    "net::ERR_CONNECTION_RESET notes?.md",
+  ])("are never read as the network by words in the path: %s", (path) => {
+    const error = vaultWriteError(path);
+    expect(isConnectionDropError(error, online)).toBe(false);
+    expect(isOfflineLikeError(error, online)).toBe(false);
+    expect(isTransientSyncError(error, online)).toBe(false);
+    expect(isServerUnavailableError(error)).toBe(false);
+  });
+});
+
+describe("server unavailable detection", () => {
+  it("names a Worker over its limits, however it arrives", () => {
+    expect(isServerUnavailableError(new ApiRequestError(503, "http_503", "error code: 1102"))).toBe(
+      true,
+    );
+    expect(isServerUnavailableError(new Error("error code: 1102"))).toBe(true);
+    expect(isServerUnavailableError({ code: "http_502", message: "" })).toBe(true);
+    expect(isServerUnavailableError(new Error("Service Unavailable"))).toBe(true);
+  });
+
+  it("does not call a client-side problem a server failure", () => {
+    expect(isServerUnavailableError(new Error("sync token expired"))).toBe(false);
+    expect(isServerUnavailableError(new ApiRequestError(429, "http_429", "slow down"))).toBe(false);
+    expect(isServerUnavailableError(new ApiRequestError(413, "quota_exceeded", "full"))).toBe(false);
+    expect(isServerUnavailableError(new Error("net::ERR_CONNECTION_RESET"))).toBe(false);
   });
 });
 

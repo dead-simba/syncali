@@ -2,8 +2,8 @@ import type { Plugin } from "obsidian";
 
 import type { SynchErrorContextKey } from "../../i18n";
 import {
+  isConnectionDropError,
   isOffline as detectOffline,
-  isOfflineLikeError,
   type OfflineDetector,
 } from "../../http/network-status";
 import type { RemoteVaultUnavailableError } from "../../remote-vault/unavailable";
@@ -234,7 +234,10 @@ export class SyncEngine {
       this.deps.setSyncStatus("up_to_date");
     },
     onError: (error) => {
-      if (isOfflineLikeError(error, this.deps.isOffline)) {
+      // A dropped connection is reported as the status, not as an error: the
+      // next pass retries it anyway, and a notice for every Wi-Fi handover
+      // buried the problems that needed the user.
+      if (isConnectionDropError(error, this.deps.isOffline)) {
         this.deps.setSyncStatus("offline");
         return;
       }

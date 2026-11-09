@@ -1,5 +1,7 @@
 import { getLanguage } from "obsidian";
+import { isServerUnavailableError } from "./http/network-status";
 import type { VaultPasswordValidation } from "./remote-vault/password-policy";
+import { platformRefusedName } from "./sync/vault/vault-writer";
 
 const en = {
     account: "Account",
@@ -266,6 +268,10 @@ const en = {
     "version.restored": "Version restored.",
     "version.syncFirst": "Sync first",
     "error.detail": ({ context, message }: { context: string; message: string }) => `${context}: ${message}`,
+    "error.nameRefusedByPlatform": ({ path, characters }: { path: string; characters: string }) =>
+      `Could not create "${path}" on this device. Android does not allow ${characters} in file or folder names. Rename it on your computer and sync will continue.`,
+    "error.serverUnavailable": ({ detail }: { detail: string }) =>
+      `Your Syncali server could not handle a sync request (${detail}). Nothing was lost, and Syncali will try again on its own. If this keeps happening, check that your server is running.`,
     "error.autoSync": "Automatic sync failed",
     "error.autoSyncInitialization": "Automatic sync initialization failed",
     "error.autoSyncResume": "Automatic sync could not resume",
@@ -1301,6 +1307,26 @@ export function formatErrorNotice(
     error.code === "cursor_ahead_of_server"
   ) {
     return t("sync.cursorMismatch");
+  }
+
+  // Named errors replace "<context>: <raw platform text>" with what happened,
+  // what it means and what to do. Each one is only used when the error proves
+  // its cause; anything else keeps the generic form below.
+  const refusedName = platformRefusedName(error);
+  if (refusedName) {
+    return t("error.nameRefusedByPlatform", {
+      path: refusedName.path,
+      characters: refusedName.characters.join(" or "),
+    });
+  }
+
+  // "Will try again on its own" is only true of automatic sync. A server
+  // failure during something the user started, such as creating a vault, keeps
+  // the generic form so it does not promise a retry that is not coming.
+  if (contextKey === "error.autoSync" && isServerUnavailableError(error)) {
+    return t("error.serverUnavailable", {
+      detail: describeErrorForNotice(error) || "no details",
+    });
   }
 
   const message = describeErrorForNotice(error);

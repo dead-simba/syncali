@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { resetObsidianMocks, setLanguage } from "obsidian";
 
+import { ApiRequestError } from "./http/request";
 import { formatErrorNotice, getSynchLocale, t } from "./i18n";
+import { renameVaultPath, VaultWriteError, writeVaultBytes } from "./sync/vault/vault-writer";
 
 describe("Syncali i18n", () => {
   beforeEach(() => {
@@ -124,5 +126,114 @@ describe("Syncali error notices", () => {
     expect(formatErrorNotice({ nope: true }, "error.autoSync")).toBe(
       "Automatic sync failed",
     );
+  });
+});
+
+describe("Syncali named error notices", () => {
+  beforeEach(() => {
+    resetObsidianMocks();
+  });
+
+  function androidWriter() {
+    const refuse = async () => {
+      throw new Error("FILE_NOTCREATED");
+    };
+    return {
+      exists: async () => true,
+      mkdir: refuse,
+      writeText: refuse,
+      writeBinary: refuse,
+      rename: refuse,
+    };
+  }
+
+  async function caught(run: () => Promise<unknown>): Promise<unknown> {
+    try {
+      await run();
+    } catch (error) {
+      return error;
+    }
+    throw new Error("expected the operation to fail");
+  }
+
+  it("names the file, the character and the fix when Android refuses a name", async () => {
+    // What the phone showed instead: 'Automatic sync failed: write failed for
+    // "...": FILE_NOTCREATED' - the example docs/copy-style.md calls a bug.
+    const error = await caught(() =>
+      writeVaultBytes(androidWriter(), "Notes/Why Planning is Important?.md", new Uint8Array()),
+    );
+
+    expect(formatErrorNotice(error, "error.autoSync")).toBe(
+      'Could not create "Notes/Why Planning is Important?.md" on this device. Android does not allow ? in file or folder names. Rename it on your computer and sync will continue.',
+    );
+  });
+
+  it("names every refused character, and the folder when the folder is the problem", async () => {
+    const writer = { ...androidWriter(), exists: async () => false };
+    const error = await caught(() =>
+      writeVaultBytes(writer, "Q&A: what? /note.md", new Uint8Array()),
+    );
+
+    expect(formatErrorNotice(error, "error.autoSync")).toBe(
+      'Could not create "Q&A: what? " on this device. Android does not allow : or ? in file or folder names. Rename it on your computer and sync will continue.',
+    );
+  });
+
+  it("names the destination of a rename, not the arrow between the two names", async () => {
+    const error = await caught(() =>
+      renameVaultPath(androidWriter(), "Notes/plain.md", "Notes/Why?.md"),
+    );
+
+    expect(formatErrorNotice(error, "error.autoSync")).toBe(
+      'Could not create "Notes/Why?.md" on this device. Android does not allow ? in file or folder names. Rename it on your computer and sync will continue.',
+    );
+  });
+
+  it("does not blame the name when nothing in it is refused", async () => {
+    // A full disk or a permission problem gives the same code on Android.
+    const error = await caught(() =>
+      writeVaultBytes(androidWriter(), "Notes/plain.md", new Uint8Array()),
+    );
+
+    expect(formatErrorNotice(error, "error.autoSync")).toBe(
+      'Automatic sync failed: write failed for "Notes/plain.md": FILE_NOTCREATED',
+    );
+  });
+
+  it("does not say 'could not create' about a delete", () => {
+    const error = new VaultWriteError("delete", "Notes/Why?.md", new Error("FILE_NOTCREATED"));
+
+    expect(formatErrorNotice(error, "error.autoSync")).toBe(
+      'Automatic sync failed: delete failed for "Notes/Why?.md": FILE_NOTCREATED',
+    );
+  });
+
+  it("still names the file when the write error arrives wrapped", async () => {
+    const inner = await caught(() =>
+      writeVaultBytes(androidWriter(), "Notes/Why?.md", new Uint8Array()),
+    );
+    const wrapped = Object.assign(new Error("pull failed"), { cause: inner });
+
+    expect(formatErrorNotice(wrapped, "error.autoSync")).toContain(
+      'Could not create "Notes/Why?.md" on this device.',
+    );
+  });
+
+  it("names an overloaded server during automatic sync, and promises the retry that is coming", () => {
+    // Reached the user as "Automatic sync failed: error code: 1102 (http_503)".
+    expect(
+      formatErrorNotice(new ApiRequestError(503, "http_503", "error code: 1102"), "error.autoSync"),
+    ).toBe(
+      "Your Syncali server could not handle a sync request (error code: 1102 (http_503)). Nothing was lost, and Syncali will try again on its own. If this keeps happening, check that your server is running.",
+    );
+  });
+
+  it("does not promise a retry for something the user started", () => {
+    expect(
+      formatErrorNotice(
+        new ApiRequestError(503, "http_503", "error code: 1102"),
+        "error.vaultCreation",
+      ),
+    ).toBe("Vault creation failed: error code: 1102 (http_503)");
   });
 });

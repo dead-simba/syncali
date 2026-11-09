@@ -37,6 +37,33 @@ const OFFLINE_ERROR_MARKERS = [
   "no address associated with hostname",
 ];
 
+// Dropped connections in Chromium's wording, which is how Obsidian on desktop
+// reports them. Deliberately not in OFFLINE_ERROR_MARKERS: the push treats an
+// offline error as "abandon the whole batch", so one file that hits the same
+// reset every time would block everything behind it, uncounted and never set
+// aside, behind an "offline" status. These only decide what the user is shown.
+//
+// Without them every Wi-Fi handover or laptop sleep popped "Automatic sync
+// failed: net::ERR_CONNECTION_RESET" - 66 of the 82 problems recorded across
+// two desktop vaults. The first eight are the codes those logs contained; the
+// rest are Chromium's spelling of drops already listed above. Not every
+// net::ERR_ belongs here: a certificate or proxy error is a setting the user
+// has to fix, and must stay visible.
+const CONNECTION_DROP_MARKERS = [
+  "net::err_connection_reset",
+  "net::err_network_changed",
+  "net::err_name_not_resolved",
+  "net::err_quic_protocol_error",
+  "net::err_connection_timed_out",
+  "net::err_timed_out",
+  "net::err_address_unreachable",
+  "net::err_network_io_suspended",
+  "net::err_internet_disconnected",
+  "net::err_connection_closed",
+  "net::err_connection_refused",
+  "net::err_connection_aborted",
+];
+
 export function isBrowserOffline(): boolean {
   return (
     typeof globalThis.navigator !== "undefined" &&
@@ -61,6 +88,29 @@ export function isOfflineLikeError(
 
   const message = getErrorText(error).toLowerCase();
   return OFFLINE_ERROR_MARKERS.some((marker) => message.includes(marker));
+}
+
+/**
+ * Whether to tell the user "offline" rather than show the error: the link
+ * dropped, in any platform's wording.
+ *
+ * Wider than `isOfflineLikeError`, which also decides whether a push abandons
+ * its batch and so must not include Chromium's codes (see above). Use this one
+ * only for what the user sees - the status and whether a notice appears.
+ */
+export function isConnectionDropError(
+  error: unknown,
+  isOfflineOverride?: OfflineDetector,
+): boolean {
+  if (isOfflineLikeError(error, isOfflineOverride)) {
+    return true;
+  }
+  if (isLocalFileError(error)) {
+    return false;
+  }
+
+  const message = getErrorText(error).toLowerCase();
+  return CONNECTION_DROP_MARKERS.some((marker) => message.includes(marker));
 }
 
 // Failures that are worth retrying but are not "offline". Kept out of
@@ -132,6 +182,40 @@ export function isTransientSyncError(
   return TRANSIENT_ERROR_MARKERS.some((marker) => message.includes(marker));
 }
 
+// The server was reached and could not handle the request: a 5xx, or one of
+// Cloudflare's own pages for a Worker over its limits (1102) or shedding load
+// (1200). Narrower than TRANSIENT_ERROR_MARKERS - an expired token or a rate
+// limit is not the server failing - because this decides the wording the user
+// sees, not only whether to retry.
+const SERVER_UNAVAILABLE_MARKERS = [
+  "error code: 1102",
+  "error code: 1200",
+  "service unavailable",
+  "bad gateway",
+  "gateway timeout",
+];
+
+const SERVER_UNAVAILABLE_CODE = /^(?:http_)?5\d\d$/;
+
+export function isServerUnavailableError(error: unknown): boolean {
+  if (isLocalFileError(error)) {
+    return false;
+  }
+
+  const status = getErrorField(error, "status");
+  if (typeof status === "number" && status >= 500 && status <= 599) {
+    return true;
+  }
+
+  const code = getErrorField(error, "code");
+  if (typeof code === "string" && SERVER_UNAVAILABLE_CODE.test(code.trim().toLowerCase())) {
+    return true;
+  }
+
+  const message = getErrorText(error).toLowerCase();
+  return SERVER_UNAVAILABLE_MARKERS.some((marker) => message.includes(marker));
+}
+
 // File-system failures, by the code Node gives them. Their message names the
 // file, and a path is the user's own words: matched as text, a note under
 // "Offline maps/" read as a dropped connection and was retried on every push
@@ -150,6 +234,15 @@ const LOCAL_FILE_ERROR_CODES = new Set([
 ]);
 
 function isLocalFileError(error: unknown): boolean {
+  // A failed vault write carries the path in its message and, on Android, no
+  // code at all ("write failed for "Offline maps/x.md": FILE_NOTCREATED"), so
+  // nothing below would catch it and the path's words would be matched as
+  // network text. It is a file operation by construction. Matched by name so
+  // this module does not depend on the vault layer.
+  if (error instanceof Error && error.name === "VaultWriteError") {
+    return true;
+  }
+
   const code = getErrorField(error, "code");
   if (typeof code === "string") {
     return LOCAL_FILE_ERROR_CODES.has(code);
