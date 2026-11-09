@@ -101,8 +101,8 @@ function readLocalCopies(vaultPaths) {
 	return byDevice;
 }
 
-function count(n, noun) {
-	return `${Number(n).toLocaleString()} ${noun}${n === 1 ? "" : "s"}`;
+function count(n, noun, plural = `${noun}s`) {
+	return `${Number(n).toLocaleString()} ${n === 1 ? noun : plural}`;
 }
 
 function main() {
@@ -141,11 +141,13 @@ function main() {
 
 		console.log(`\nVault "${vault.name}"`);
 		console.log(
-			`  Server: ${count(vault.entry_count ?? 0, "entry")}, cursor ${Number(latestServerCursor).toLocaleString()}` +
+			`  Server: ${count(vault.entry_count ?? 0, "entry", "entries")}, cursor ${Number(latestServerCursor).toLocaleString()}` +
 				(vault.last_commit_at ? `, last change ${formatDate(vault.last_commit_at)}` : ""),
 		);
 		if (reports.length === 0) {
-			console.log("  No device has reported yet. Devices report once they run a Syncali version with device reports.");
+			console.log(
+				"  No device has reported yet. A device reports while it runs Syncali 0.3.29 or later with this vault open.",
+			);
 			continue;
 		}
 
