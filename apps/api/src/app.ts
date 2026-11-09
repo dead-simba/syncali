@@ -15,6 +15,8 @@ import { registerBlobRoutes } from "./sync/blob/routes";
 import type { BlobStorage } from "./sync/blob/storage";
 import { registerCoordinatorProxyRoutes } from "./sync/coordinator/proxy-routes";
 import type { CoordinatorProxyRepository } from "./sync/coordinator/proxy-repository";
+import type { DeviceReportStore } from "./sync/health/device-report-repository";
+import { registerDeviceReportRoutes } from "./sync/health/device-report-routes";
 import { registerVaultRoutes } from "./vault/routes";
 import type { VaultService } from "./vault/service";
 
@@ -24,6 +26,7 @@ export type AppDependencies = {
 	syncTokenService: SyncTokenService;
 	blobRepository: BlobStorage;
 	coordinatorProxyRepository: CoordinatorProxyRepository;
+	deviceReportRepository: DeviceReportStore;
 	vaultService: VaultService;
 	subscriptionPolicyService: SubscriptionPolicyReader;
 	billingService: BillingService;
@@ -57,6 +60,7 @@ export function createApp(deps: AppDependencies, config: AppConfig): Hono {
 		registerBillingRoutes(app, deps);
 	}
 	registerBlobRoutes(app, deps);
+	registerDeviceReportRoutes(app, deps);
 	registerCoordinatorProxyRoutes(app, deps);
 
 	app.notFound((c) =>

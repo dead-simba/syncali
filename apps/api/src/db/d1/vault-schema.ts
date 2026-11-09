@@ -121,6 +121,37 @@ export const vaultSyncStatus = sqliteTable(
 	],
 );
 
+/**
+ * The latest health report from each device (local vault) syncing a vault.
+ *
+ * `report_json` holds counters only - versions, cursors, times, counts - and is
+ * readable by whoever runs the server. Anything that names a file or quotes an
+ * error is in `details_envelope`, encrypted on the device with a key derived
+ * from the vault key, so the server stores it without being able to read it.
+ * See docs/device-reports.md.
+ */
+export const vaultDeviceReport = sqliteTable(
+	"vault_device_report",
+	{
+		vaultId: text("vault_id")
+			.notNull()
+			.references(() => vault.id, { onDelete: "cascade" }),
+		localVaultId: text("local_vault_id").notNull(),
+		userId: text("user_id").notNull(),
+		platform: text("platform").notNull(),
+		pluginVersion: text("plugin_version").notNull(),
+		reportJson: text("report_json").notNull(),
+		detailsEnvelope: text("details_envelope"),
+		reportedAt: integer("reported_at").notNull(),
+		createdAt: integer("created_at").notNull(),
+		updatedAt: integer("updated_at").notNull(),
+	},
+	(table) => [
+		primaryKey({ columns: [table.vaultId, table.localVaultId] }),
+		index("vault_device_report_reported_idx").on(table.vaultId, table.reportedAt),
+	],
+);
+
 export const vaultRelations = relations(vault, ({ many, one }) => ({
 	organization: one(organization, {
 		fields: [vault.organizationId],

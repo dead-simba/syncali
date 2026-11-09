@@ -7,6 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { createApp } from "../app";
+import { DeviceReportRepository } from "../sync/health/device-report-repository";
 import { createAuth } from "../auth";
 import { BillingRepository } from "../billing/repository";
 import { BillingService } from "../billing/service";
@@ -140,6 +141,7 @@ export async function createNodeRuntime(config: NodeRuntimeConfig) {
 			syncTokenService,
 			blobRepository: config.blobStorage,
 			coordinatorProxyRepository,
+			deviceReportRepository: new DeviceReportRepository(db),
 			subscriptionPolicyService,
 			billingService,
 		},

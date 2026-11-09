@@ -1,4 +1,5 @@
 import { createApp } from "../app";
+import { DeviceReportRepository } from "../sync/health/device-report-repository";
 import { createAuth } from "../auth";
 import { createEmailVerificationConfig } from "../auth/email";
 import type { AuthConfig } from "../auth/factory";
@@ -233,6 +234,7 @@ function buildRuntimeApp(env: RuntimeEnv, authBaseUrl: string): RuntimeApp {
 			syncTokenService,
 			blobRepository,
 			coordinatorProxyRepository,
+			deviceReportRepository: new DeviceReportRepository(db),
 			subscriptionPolicyService,
 			billingService,
 		},

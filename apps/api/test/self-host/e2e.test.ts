@@ -290,6 +290,78 @@ describe("self-hosted Node runtime: end-to-end sync", () => {
 		expect(robots.headers.get("content-type")).toMatch(/^text\/plain/);
 	});
 
+	it("keeps the latest health report from each device, and announces that it does", async () => {
+		const { dataDir, runtime, server, wss, baseUrl } = await bootServer();
+		cleanup.push(() => rmSync(dataDir, { recursive: true, force: true }));
+		cleanup.push(() => runtime.dispose());
+		cleanup.push(() => closeServer(server, wss));
+
+		const { sessionCookie, vaultId } = await signUpAndCreateVault(baseUrl);
+		const phoneToken = await issueSyncToken(baseUrl, sessionCookie, vaultId, "phone");
+		const laptopToken = await issueSyncToken(baseUrl, sessionCookie, vaultId, "laptop");
+
+		const socket = await connectSocket(baseUrl, vaultId, laptopToken);
+		cleanup.push(() => socket.close());
+		socket.send(JSON.stringify({ type: "hello", requestId: "hello", lastKnownCursor: 0 }));
+		const helloAck = (await nextMessage(socket, (m) => m.type === "hello_ack")) as {
+			features?: string[];
+		};
+		expect(helloAck.features).toContain("device_reports");
+
+		const report = (cursor: number) => ({
+			schema: 1,
+			generatedAt: Date.now(),
+			platform: "android",
+			mobile: true,
+			pluginVersion: "0.3.29",
+			obsidianVersion: "1.15.0",
+			status: "up_to_date",
+			cursor,
+			serverCursor: cursor,
+			activeSince: Date.now(),
+			lastSyncOkAt: Date.now(),
+			lastErrorAt: null,
+			pendingUploads: 0,
+			setAside: 0,
+			skippedUnreadable: 0,
+			problems: {},
+			files: { count: 3, digest: "b".repeat(64) },
+			rules: { images: true, audio: true, videos: false, pdf: true, other: true, excludedFolders: 0 },
+		});
+		const putReport = async (token: string, cursor: number, details: string | null) =>
+			await fetch(`${baseUrl}/v1/vaults/${vaultId}/device-report`, {
+				method: "PUT",
+				headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+				body: JSON.stringify({ report: report(cursor), details }),
+			});
+
+		expect((await putReport(phoneToken, 5, "first")).status).toBe(204);
+		// A second report replaces the first rather than adding a row.
+		expect((await putReport(phoneToken, 9, "second")).status).toBe(204);
+		expect((await putReport(laptopToken, 9, null)).status).toBe(204);
+
+		const listed = await fetch(`${baseUrl}/v1/vaults/${vaultId}/device-reports`, {
+			headers: { authorization: `Bearer ${phoneToken}` },
+		});
+		expect(listed.status).toBe(200);
+		const body = (await listed.json()) as {
+			reports: Array<{
+				localVaultId: string;
+				isRequestingDevice: boolean;
+				report: { cursor: number };
+				details: string | null;
+			}>;
+		};
+		const byDevice = Object.fromEntries(body.reports.map((entry) => [entry.localVaultId, entry]));
+		expect(Object.keys(byDevice).sort()).toEqual(["laptop", "phone"]);
+		expect(byDevice.phone).toMatchObject({
+			isRequestingDevice: true,
+			report: { cursor: 9 },
+			details: "second",
+		});
+		expect(byDevice.laptop).toMatchObject({ isRequestingDevice: false, details: null });
+	});
+
 	it("syncs a mutation between two simulated devices with no Cloudflare dependency", async () => {
 		const { dataDir, runtime, server, wss, baseUrl } = await bootServer();
 		cleanup.push(() => rmSync(dataDir, { recursive: true, force: true }));

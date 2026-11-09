@@ -70,7 +70,10 @@ export const listEntryStatesMessageSchema = z.object({
  * answers with a `session_error` that carries no requestId, which the client
  * cannot tie back to the request it was waiting on.
  */
-export const COORDINATOR_FEATURES = ["get_entry_states"] as const;
+// "device_reports" is not a socket message: it says this deployment serves
+// PUT/GET /v1/vaults/:vaultId/device-report(s). Announced here because the
+// hello is where a client learns what the server it is talking to can do.
+export const COORDINATOR_FEATURES = ["get_entry_states", "device_reports"] as const;
 
 export const MAX_ENTRY_STATES_BY_ID = 100;
 
