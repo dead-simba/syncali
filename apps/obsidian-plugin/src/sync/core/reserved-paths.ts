@@ -7,6 +7,24 @@ const NEVER_SYNC_RESERVED_SEGMENTS = new Set([
 
 const MACOS_FOLDER_ICON = /^Icon[\r\n]$/;
 
+/**
+ * How Obsidian marks a file that lives outside the vault.
+ *
+ * Since 1.14, desktop Obsidian can open a file from anywhere on disk. It
+ * becomes a `TExternalFile` - a subclass of `TFile` - whose path is this
+ * prefix followed by the file's real location, and while it is open Obsidian
+ * watches it and fires the vault's own `modify` and `delete` events whenever it
+ * changes on disk. Obsidian's file system adapter strips the prefix and
+ * resolves the rest as an absolute path, so reading, writing or deleting one
+ * of these paths touches the real file outside the vault.
+ *
+ * None of it is part of the vault. Previewing a draft from another project
+ * uploaded it as `file:/Users/...`; Android cannot create a name containing
+ * `:`, so every pull on the phone failed on it and nothing after it arrived.
+ * Obsidian's own test is a case-sensitive prefix match, and so is this one.
+ */
+const OBSIDIAN_EXTERNAL_FILE_PREFIX = "file:";
+
 export type SyncPathSafetyClass =
   | "normal"
   | "reserved-never-sync"
@@ -19,6 +37,10 @@ export function classifySyncPath(
   const normalized = normalizeReservedPath(path);
   if (!normalized) {
     return "normal";
+  }
+
+  if (isObsidianExternalFilePath(normalized)) {
+    return "reserved-never-sync";
   }
 
   const segments = normalized.split("/");
@@ -47,6 +69,11 @@ export function isReservedSyncPath(path: string): boolean {
 
 export function isNeverSyncReservedPath(path: string): boolean {
   return classifySyncPath(path) === "reserved-never-sync";
+}
+
+/** A file Obsidian has open from outside the vault. See the prefix above. */
+export function isObsidianExternalFilePath(path: string): boolean {
+  return path.startsWith(OBSIDIAN_EXTERNAL_FILE_PREFIX);
 }
 
 function normalizeReservedPath(path: string): string {
