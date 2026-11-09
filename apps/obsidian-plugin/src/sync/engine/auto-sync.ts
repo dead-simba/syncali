@@ -56,6 +56,8 @@ export interface SyncAutoLoopDeps {
   onSyncScheduled?: () => void;
   onIdle?: () => void;
   onError?: (error: unknown) => void;
+  /** The server's cursor, whenever this loop learns it: at hello and on each broadcast. */
+  onServerCursor?: (cursor: number) => void;
   onRemoteVaultUnavailable?: (error: RemoteVaultUnavailableError) => void | Promise<void>;
   onStorageQuotaExceeded?: () => void | Promise<void>;
 }
@@ -153,6 +155,14 @@ export class SyncAutoLoop {
     }
   }
 
+  /**
+   * The session if one is open, without opening one. For work that should
+   * ride along with sync rather than cause a connection of its own.
+   */
+  getLiveSession(): SyncRealtimeSession | null {
+    return this.realtimeSession;
+  }
+
   async withRealtimeSession<T>(
     work: (session: SyncRealtimeSession) => Promise<T>,
   ): Promise<T> {
@@ -204,6 +214,7 @@ export class SyncAutoLoop {
         cursor,
         {
           onCursorAdvanced: (nextCursor) => {
+            this.deps.onServerCursor?.(nextCursor);
             this.requestPull(nextCursor);
           },
           onStorageStatusUpdated: (status) => {
@@ -240,6 +251,7 @@ export class SyncAutoLoop {
       }
 
       this.realtimeSession = session;
+      this.deps.onServerCursor?.(session.serverCursor);
       try {
         if (cursor > session.serverCursor) {
           throw new SyncRealtimeError(

@@ -1,4 +1,5 @@
 import type { AuthReadiness } from "../auth/manager";
+import type { DeviceReportsSnapshot } from "../sync/health/device-reporter";
 import type {
   SynchDeletedFileCursor,
   SynchDeletedFilesPage,
@@ -41,8 +42,9 @@ export interface SynchSettingsController {
   /** Version of the plugin actually running, for the settings heading. */
   getPluginVersion(): string;
   listFileSizeBlockedFiles(): Promise<SynchFileSizeBlockedFile[]>;
+  listDeviceReports(): Promise<DeviceReportsSnapshot | null>;
   retryFilesNotSyncing(): Promise<void>;
-  listRecentProblems(): readonly { at: number; message: string }[];
+  listRecentProblems(): readonly { at: number; message: string; firstAt?: number; count?: number }[];
   recentProblemsAsText(): string;
   clearRecentProblems(): Promise<void>;
   listSyncConflicts(): SynchSyncConflict[];

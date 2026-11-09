@@ -34,6 +34,7 @@ import {
   type SyncFileSizeBlockedFile,
 } from "./engine";
 import type { SyncEntryVersionPreview } from "./version-history-service";
+import type { DeviceReportsSnapshot, SyncHealthDeps } from "../health/device-reporter";
 import {
   formatUserVisibleSyncState,
   getUserVisibleSyncDisplayPercent,
@@ -70,6 +71,8 @@ export interface SyncControllerDeps {
     error: RemoteVaultUnavailableError,
   ) => void | Promise<void>;
   isOffline?: OfflineDetector;
+  /** Device health reporting. The status is supplied here, where it is kept. */
+  health?: Omit<SyncHealthDeps, "getSyncStatus">;
 }
 
 export class SyncController {
@@ -105,6 +108,9 @@ export class SyncController {
       await this.handleRemoteVaultUnavailable(error);
     },
     isOffline: this.deps.isOffline,
+    health: this.deps.health
+      ? { ...this.deps.health, getSyncStatus: () => this.syncStatus }
+      : undefined,
   });
   private storageStatus: SyncStorageStatus | null = null;
 
@@ -136,6 +142,10 @@ export class SyncController {
 
   async readLocalVaultId(): Promise<string> {
     return await this.syncEngine.readLocalVaultId();
+  }
+
+  async listDeviceReports(): Promise<DeviceReportsSnapshot | null> {
+    return await this.syncEngine.listDeviceReports();
   }
 
   async getOrCreateLocalVaultId(remoteVaultId: string): Promise<string> {

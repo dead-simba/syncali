@@ -45,6 +45,12 @@ import { SyncAuthorizedRequestClient } from "../remote/request-client";
 import { SyncBlobClient } from "../remote/blob-client";
 import { SyncPullClient } from "../remote/pull-client";
 import {
+  DeviceReporter,
+  type DeviceReportsSnapshot,
+  type SyncHealthDeps,
+} from "../health/device-reporter";
+import { classifySyncError, type ProblemKind } from "../health/problem-kind";
+import {
   type EntryVersion,
   type DeletedEntryPageCursor,
   type EntryVersionPageCursor,
@@ -111,6 +117,8 @@ export interface SyncEngineDeps {
     error: RemoteVaultUnavailableError,
   ) => void | Promise<void>;
   isOffline?: OfflineDetector;
+  /** Present when this device should report on its own sync health. */
+  health?: SyncHealthDeps;
 }
 
 export class SyncEngine {
@@ -152,7 +160,10 @@ export class SyncEngine {
     onProgress: async (progress) => {
       this.reportActivityProgress(progress);
     },
-    onConflict: (event) => this.deps.notifySyncConflict(event),
+    onConflict: (event) => {
+      this.recordHealthProblem("conflict");
+      this.deps.notifySyncConflict(event);
+    },
     onFileSizeBlockedFilesChange: () => {
       this.deps.onFileSizeBlockedFilesChange?.();
     },
@@ -160,11 +171,13 @@ export class SyncEngine {
       // A parked file is the one failure the user cannot infer from anything
       // else: sync carries on and reports success while that file quietly stops
       // travelling. Name it, and say what makes it try again.
+      this.recordHealthProblem("set_aside");
       void this.describeQuarantinedMutation(event);
     },
     applyEntryStatesById: async (session, entryIds) =>
       await this.syncPullService.applyEntryStatesById(session, entryIds),
     onStaleRecovery: (event) => {
+      this.recordHealthProblem("stale_recovered");
       void this.recordStaleRecovery(event);
     },
   });
@@ -231,9 +244,14 @@ export class SyncEngine {
       this.setOnlineSyncStatus("syncing");
     },
     onIdle: () => {
+      this.deps.health?.tracker.recordSyncOk();
       this.deps.setSyncStatus("up_to_date");
     },
+    onServerCursor: (cursor) => {
+      this.deps.health?.tracker.recordServerCursor(cursor);
+    },
     onError: (error) => {
+      this.recordHealthProblem(classifySyncError(error, this.deps.isOffline));
       // A dropped connection is reported as the status, not as an error: the
       // next pass retries it anyway, and a notice for every Wi-Fi handover
       // buried the problems that needed the user.
@@ -283,9 +301,31 @@ export class SyncEngine {
     onProgress: async (progress) => {
       this.reportActivityProgress(progress);
     },
-    onConflict: (event) => this.deps.notifySyncConflict(event),
+    onConflict: (event) => {
+      this.recordHealthProblem("conflict");
+      this.deps.notifySyncConflict(event);
+    },
     onRollbackDetected: (event) => this.deps.notifyRollbackDetected(event),
   });
+  private readonly deviceReporter = this.deps.health
+    ? new DeviceReporter({
+        plugin: this.deps.plugin,
+        health: this.deps.health,
+        getStore: () => this.syncStore,
+        getRemoteVaultKey: () => this.deps.getRemoteVaultKey(),
+        getSyncFileRules: () => this.deps.getSyncFileRules(),
+        isSyncedHere: (path) =>
+          shouldApplyRemoteVaultPath(path, {
+            fileRules: this.deps.getSyncFileRules(),
+            vaultConfigRules: this.deps.getVaultConfigSyncRules(),
+          }),
+        getLiveSession: () => this.syncAutoLoop.getLiveSession(),
+        getSyncToken: async () => await this.deps.getSyncToken(),
+        requestClient: this.syncRequestClient,
+        listSetAsideFiles: async () => await this.listFileSizeBlockedFiles(),
+        countSkippedUnreadable: () => this.reportedUndecryptableEntries.size,
+      })
+    : null;
   private readonly syncVersionHistoryService = new SyncVersionHistoryService({
     getApiBaseUrl: () => this.deps.getApiBaseUrl(),
     getSyncToken: async () => await this.deps.getSyncToken(),
@@ -341,12 +381,22 @@ export class SyncEngine {
   async startAutoSync(): Promise<boolean> {
     const started = await this.syncAutoLoop.start();
     this.startHiddenFolderReconcileTimer();
+    if (started) {
+      this.deps.health?.tracker.markActive();
+      this.deviceReporter?.start();
+    }
     return started;
   }
 
   stopAutoSync(): void {
+    this.deviceReporter?.stop();
     this.stopHiddenFolderReconcileTimer();
     this.syncAutoLoop.stop();
+  }
+
+  /** Every device's latest health report, or null where the server has none. */
+  async listDeviceReports(): Promise<DeviceReportsSnapshot | null> {
+    return (await this.deviceReporter?.fetchReports()) ?? null;
   }
 
   reconnectAutoSync(): void {
@@ -356,6 +406,7 @@ export class SyncEngine {
   async resumeAutoSyncConnection(): Promise<void> {
     await this.syncAutoLoop.resumeConnection();
     this.startHiddenFolderReconcileTimer();
+    this.deps.health?.tracker.markActive();
   }
 
   refreshHiddenFolderReconcileTimer(): void {
@@ -694,6 +745,7 @@ export class SyncEngine {
       return;
     }
     this.reportedUndecryptableEntries.add(event.entryId);
+    this.recordHealthProblem("unreadable_entry");
 
     let path: string | null = null;
     try {
@@ -906,6 +958,22 @@ export class SyncEngine {
 
   private isOffline(): boolean {
     return detectOffline(this.deps.isOffline);
+  }
+
+  /**
+   * Count a problem for this device's health report. Saved straight away
+   * except for dropped connections, which come in bursts during an outage and
+   * are saved with the next report instead.
+   */
+  private recordHealthProblem(kind: ProblemKind): void {
+    const tracker = this.deps.health?.tracker;
+    if (!tracker) {
+      return;
+    }
+    tracker.recordProblem(kind);
+    if (kind !== "connection_drop") {
+      void tracker.persist().catch(() => undefined);
+    }
   }
 
   private setOnlineSyncStatus(status: "reconnecting" | "syncing"): void {

@@ -636,7 +636,7 @@ export class RecentProblemsModal extends Modal {
   constructor(
     app: App,
     private readonly deps: {
-      listProblems: () => readonly { at: number; message: string }[];
+      listProblems: () => readonly { at: number; message: string; firstAt?: number; count?: number }[];
       asText: () => string;
       clear: () => Promise<void>;
     },
@@ -662,8 +662,17 @@ export class RecentProblemsModal extends Modal {
 
     const list = contentEl.createDiv();
     for (const problem of problems) {
+      // A repeat is one row, so say how long it has been going on: "since
+      // 26 Oct, 1,400 times" reads very differently from one time today.
+      const repeated =
+        problem.count && problem.count > 1
+          ? ` · ${t("problems.repeated", {
+              count: problem.count.toLocaleString(),
+              since: formatProblemTime(problem.firstAt ?? problem.at),
+            })}`
+          : "";
       new Setting(list)
-        .setName(formatProblemTime(problem.at))
+        .setName(`${formatProblemTime(problem.at)}${repeated}`)
         .setDesc(problem.message);
     }
 

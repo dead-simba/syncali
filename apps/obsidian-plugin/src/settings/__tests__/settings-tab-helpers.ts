@@ -25,6 +25,7 @@ export function createSettingsTab(
     listFileSizeBlockedFiles: vi.fn(async () => []),
     retryFilesNotSyncing: vi.fn(async () => {}),
     listRecentProblems: vi.fn(() => []),
+    listDeviceReports: vi.fn(async () => null),
     recentProblemsAsText: vi.fn(() => "No problems recorded."),
     clearRecentProblems: vi.fn(async () => {}),
     listSyncConflicts: vi.fn(() => []),

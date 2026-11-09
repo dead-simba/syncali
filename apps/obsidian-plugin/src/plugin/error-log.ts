@@ -16,8 +16,16 @@ const STORE_KEY = "errorLog";
 const MAX_ENTRIES = 50;
 
 export interface SyncErrorLogEntry {
+  /** When this message was last seen. */
   at: number;
   message: string;
+  /**
+   * When it was first seen in this run of repeats, and how many times. A
+   * repeat used to overwrite `at` and nothing else, so one line dated today
+   * hid a failure that had happened on every pull for two weeks.
+   */
+  firstAt: number;
+  count: number;
 }
 
 export class SyncErrorLog {
@@ -33,21 +41,29 @@ export class SyncErrorLog {
 
     this.entries = stored
       .filter(
-        (entry): entry is SyncErrorLogEntry =>
+        (entry): entry is Partial<SyncErrorLogEntry> & { at: number; message: string } =>
           !!entry &&
           typeof entry === "object" &&
           typeof (entry as SyncErrorLogEntry).message === "string" &&
           typeof (entry as SyncErrorLogEntry).at === "number",
       )
+      // Entries saved before repeats were counted have neither field.
+      .map((entry) => ({
+        at: entry.at,
+        message: entry.message,
+        firstAt: typeof entry.firstAt === "number" ? entry.firstAt : entry.at,
+        count: typeof entry.count === "number" && entry.count >= 1 ? entry.count : 1,
+      }))
       .slice(-MAX_ENTRIES);
   }
 
   /**
-   * Record a problem, collapsing an immediate repeat.
+   * Record a problem, collapsing an immediate repeat into a count.
    *
    * A failing sync retries on a timer, so the same message can arrive dozens of
    * times a minute. Keeping every copy would push the earlier, more useful
-   * errors out of a short log.
+   * errors out of a short log - but forgetting how many there were, and since
+   * when, made a two-week failure look like a one-off.
    */
   record(message: string, now = Date.now()): void {
     const trimmed = message.trim();
@@ -58,10 +74,11 @@ export class SyncErrorLog {
     const last = this.entries[this.entries.length - 1];
     if (last?.message === trimmed) {
       last.at = now;
+      last.count += 1;
       return;
     }
 
-    this.entries.push({ at: now, message: trimmed });
+    this.entries.push({ at: now, message: trimmed, firstAt: now, count: 1 });
     if (this.entries.length > MAX_ENTRIES) {
       this.entries = this.entries.slice(-MAX_ENTRIES);
     }
@@ -82,7 +99,12 @@ export class SyncErrorLog {
     }
 
     return this.list()
-      .map((entry) => `${new Date(entry.at).toISOString()}  ${entry.message}`)
+      .map((entry) => {
+        const line = `${new Date(entry.at).toISOString()}  ${entry.message}`;
+        return entry.count > 1
+          ? `${line}  (${entry.count} times since ${new Date(entry.firstAt).toISOString()})`
+          : line;
+      })
       .join("\n");
   }
 

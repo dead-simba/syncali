@@ -112,9 +112,118 @@ export async function decryptSyncBlob(
  * (corrupt stored bytes, a truncated download, a mismatched key) and telling
  * them apart starts with knowing which entry and which kind of data.
  */
+/**
+ * Which vault and which device a device report belongs to. Bound into the
+ * envelope as additional data, so a server cannot move one device's details
+ * into another device's row without the decryption failing.
+ */
+export type DeviceReportCryptoContext = {
+  vaultId: string;
+  localVaultId: string;
+};
+
+const DEVICE_REPORT_ENVELOPE_VERSION = 1;
+
+/**
+ * Encrypt the private half of a device report - file names, error text - with
+ * a key derived from the vault key for this purpose alone. The server stores
+ * the result and cannot read it; any device holding the vault key can.
+ */
+export async function encryptDeviceReportDetails(
+  remoteVaultKey: Uint8Array,
+  plaintext: Uint8Array,
+  context: DeviceReportCryptoContext,
+): Promise<string> {
+  const key = await deriveUsageKey(
+    await importVaultKey(remoteVaultKey),
+    "device-report",
+    DEVICE_REPORT_ENVELOPE_VERSION,
+  );
+  return await encryptEnvelope(
+    key,
+    plaintext,
+    encodeDeviceReportAad(context),
+    DEVICE_REPORT_ENVELOPE_VERSION,
+  );
+}
+
+export async function decryptDeviceReportDetails(
+  remoteVaultKey: Uint8Array,
+  envelope: string,
+  context: DeviceReportCryptoContext,
+): Promise<Uint8Array> {
+  const key = await deriveUsageKey(
+    await importVaultKey(remoteVaultKey),
+    "device-report",
+    DEVICE_REPORT_ENVELOPE_VERSION,
+  );
+  try {
+    return await decryptEnvelope(
+      key,
+      envelope,
+      encodeDeviceReportAad(context),
+      DEVICE_REPORT_ENVELOPE_VERSION,
+    );
+  } catch (error) {
+    throw new SyncDecryptionError(
+      "device report",
+      `device ${context.localVaultId}`,
+      error,
+    );
+  }
+}
+
+/**
+ * A keyed digest, as lowercase hex. Used to fingerprint the files a device
+ * holds: two devices with the same vault key and the same files get the same
+ * value, and a server - which has no key - cannot test a guess against it.
+ */
+export async function computeVaultKeyedDigest(
+  remoteVaultKey: Uint8Array,
+  data: Uint8Array,
+): Promise<string> {
+  const key = await crypto.subtle.deriveKey(
+    {
+      name: "HKDF",
+      hash: "SHA-256",
+      salt: toArrayBuffer(KEY_USAGE_SALT),
+      info: new TextEncoder().encode("file-fingerprint:v1"),
+    },
+    await importVaultKey(remoteVaultKey),
+    { name: "HMAC", hash: "SHA-256", length: 256 },
+    false,
+    ["sign"],
+  );
+  const signature = new Uint8Array(
+    await crypto.subtle.sign("HMAC", key, toArrayBuffer(data)),
+  );
+  return Array.from(signature, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function importVaultKey(remoteVaultKey: Uint8Array): Promise<CryptoKey> {
+  return await crypto.subtle.importKey(
+    "raw",
+    toArrayBuffer(remoteVaultKey),
+    "HKDF",
+    false,
+    ["deriveKey"],
+  );
+}
+
+function encodeDeviceReportAad(context: DeviceReportCryptoContext): Uint8Array {
+  return new TextEncoder().encode(
+    [
+      "synch.device-report",
+      `v${DEVICE_REPORT_ENVELOPE_VERSION}`,
+      context.vaultId,
+      context.localVaultId,
+    ].join("\n"),
+  );
+}
+
 export class SyncDecryptionError extends Error {
   constructor(
-    readonly kind: "metadata" | "blob",
+    readonly kind: "metadata" | "blob" | "device report",
     readonly detail: string,
     readonly cause: unknown,
   ) {

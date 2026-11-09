@@ -23,6 +23,7 @@ import {
   ExcludedFoldersModal,
   IncludedHiddenFoldersModal,
 } from "./modals";
+import { DevicesModal } from "./devices-modal";
 
 type RefreshSettings = () => void;
 
@@ -501,6 +502,19 @@ export function renderRemoteVaultSettings(
         new FilesNotSyncingModal(app, {
           listFiles: async () => await controller.listFileSizeBlockedFiles(),
           retry: async () => await controller.retryFilesNotSyncing(),
+        }).open();
+      }),
+    );
+
+  // Every device's own account of how it is syncing. The phone was stuck for
+  // two weeks with nothing anywhere saying so; this is where it would show.
+  new Setting(containerEl)
+    .setName(t("devices.header"))
+    .setDesc(t("devices.desc"))
+    .addButton((button) =>
+      button.setButtonText(t("devices.view")).onClick(() => {
+        new DevicesModal(app, {
+          listDeviceReports: async () => await controller.listDeviceReports(),
         }).open();
       }),
     );

@@ -16,6 +16,9 @@ import type {
  */
 export const SYNC_FEATURE_GET_ENTRY_STATES = "get_entry_states";
 
+/** The server keeps device health reports: PUT/GET /v1/vaults/:id/device-report(s). */
+export const SYNC_FEATURE_DEVICE_REPORTS = "device_reports";
+
 /** The most entry ids one `get_entry_states` request may carry. */
 export const MAX_ENTRY_STATES_BY_ID = 100;
 

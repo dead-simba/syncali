@@ -36,6 +36,36 @@ describe("SyncAutoLoop remote cursors", () => {
     await store.close();
   });
 
+  it("tells its owner where the server is, at hello and on every broadcast", async () => {
+    // A device's health report compares its cursor with this. A stuck device
+    // is exactly one that keeps hearing the server move and never catches up.
+    const store = await createInitializedTestSyncStore(createTestPlugin());
+    await store.setCursor(10);
+    let callbacks: SyncRealtimeCallbacks | null = null;
+    const onServerCursor = vi.fn();
+    const autoLoop = new SyncAutoLoop({
+      getApiBaseUrl: () => "http://127.0.0.1:8787",
+      getSyncToken: async () => createToken(),
+      getSyncStore: () => store,
+      pushPendingMutations: vi.fn(async () => {}),
+      pullOnce: vi.fn(async () => {}),
+      onServerCursor,
+      realtimeClient: createRealtimeClient((opened) => {
+        callbacks = opened;
+      }, undefined, 10),
+    });
+
+    await autoLoop.start();
+    await Promise.resolve();
+    (callbacks as SyncRealtimeCallbacks | null)?.onCursorAdvanced?.(14);
+
+    expect(onServerCursor.mock.calls).toEqual([[10], [14]]);
+    expect(autoLoop.getLiveSession()).not.toBeNull();
+    autoLoop.stop();
+    expect(autoLoop.getLiveSession()).toBeNull();
+    await store.close();
+  });
+
   it("does not pull after reconnecting when the server cursor matches the local cursor", async () => {
     const store = await createInitializedTestSyncStore(createTestPlugin());
     await store.setCursor(10);

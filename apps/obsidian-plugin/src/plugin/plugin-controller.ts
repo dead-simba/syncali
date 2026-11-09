@@ -58,6 +58,8 @@ import type { VaultConfigSyncRules } from "../sync/core/vault-config-rules";
 import { isReservedSyncPath } from "../sync/core/reserved-paths";
 import type { SyncTokenResponse } from "../sync/remote/client";
 import { SyncController } from "../sync/runtime/controller";
+import type { DeviceReportsSnapshot } from "../sync/health/device-reporter";
+import { SyncHealthTracker } from "../sync/health/health-tracker";
 import { SyncTokenManager } from "../sync/remote/token-manager";
 import type { StoredRemoteVaultKeySecret } from "../remote-vault/device-storage";
 import {
@@ -86,6 +88,7 @@ export class SynchPluginController implements SynchSettingsController {
   private readonly pluginDataStore = new SynchPluginDataStore(this.plugin);
   private readonly settingsStore = new SynchSettingsStore(this.pluginDataStore);
   private readonly errorLog = new SyncErrorLog(this.pluginDataStore);
+  private readonly healthTracker = new SyncHealthTracker(this.pluginDataStore);
   private readonly syncConflicts = new SynchSyncConflictController({
     plugin: this.plugin,
   });
@@ -162,6 +165,17 @@ export class SynchPluginController implements SynchSettingsController {
     recordProblem: (message) => {
       this.recordProblem(message);
     },
+    health: {
+      tracker: this.healthTracker,
+      listRecentProblems: () => this.errorLog.list(),
+      // Another device is stuck: worth a notice, and worth keeping, since on
+      // a phone the notice is gone before it can be read.
+      notifyStuckDevice: (message) => {
+        new Notice(message, 15_000);
+        this.recordProblem(message);
+      },
+      writeLocalReports: async (contents) => await this.writeLocalDeviceReports(contents),
+    },
     onSyncStatusChange: () => {
       this.emitUiEvent({ type: "sync-status-changed" });
     },
@@ -217,6 +231,7 @@ export class SynchPluginController implements SynchSettingsController {
   async initialize(): Promise<void> {
     await this.pluginDataStore.initialize();
     this.errorLog.load();
+    this.healthTracker.load();
     await this.initializeSettings();
     await this.checkServerCompatibility();
     this.storedRemoteVaultKeySecret = await readStoredRemoteVaultKeySecret(this.plugin);
@@ -941,6 +956,21 @@ export class SynchPluginController implements SynchSettingsController {
   private recordProblem(message: string): void {
     this.errorLog.record(message);
     void this.errorLog.persist();
+  }
+
+  async listDeviceReports(): Promise<DeviceReportsSnapshot | null> {
+    return await this.syncController.listDeviceReports();
+  }
+
+  /**
+   * Keep the decrypted reports next to this plugin's settings. Syncali's own
+   * folder is never synced, so this stays on this device - it is where the
+   * phone's problems can be read from the laptop, by its owner or a tool.
+   */
+  private async writeLocalDeviceReports(contents: string): Promise<void> {
+    const dir =
+      this.plugin.manifest.dir ?? `${this.plugin.app.vault.configDir}/plugins/${this.plugin.manifest.id}`;
+    await this.plugin.app.vault.adapter.write(`${dir}/device-reports.json`, contents);
   }
 
   listRecentProblems(): readonly SyncErrorLogEntry[] {

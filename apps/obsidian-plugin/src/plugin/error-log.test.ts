@@ -44,7 +44,9 @@ describe("the log of recent problems", () => {
     const reopened = new SyncErrorLog(createStore(store.stored) as never);
     reopened.load();
 
-    expect(reopened.list()).toEqual([{ at: 1_000, message: "sync failed" }]);
+    expect(reopened.list()).toEqual([
+      { at: 1_000, message: "sync failed", firstAt: 1_000, count: 1 },
+    ]);
   });
 
   it("collapses a repeat instead of letting it flood the log", () => {
@@ -57,8 +59,32 @@ describe("the log of recent problems", () => {
     }
 
     expect(log.list()).toHaveLength(2);
-    expect(log.list()[0]).toEqual({ at: 2_059, message: "connection lost" });
+    expect(log.list()[0]).toEqual({
+      at: 2_059,
+      message: "connection lost",
+      firstAt: 2_000,
+      count: 60,
+    });
     expect(log.list()[1]?.message).toBe("earlier and more useful");
+  });
+
+  it("says how long a repeated problem has been happening, not only when it last did", () => {
+    // One line dated today, read as a one-off, was a failure on every pull for
+    // two weeks. The text form is what gets pasted into a bug report.
+    const log = new SyncErrorLog(createStore() as never);
+    log.record("write failed", Date.UTC(2026, 9, 26, 6, 20));
+    log.record("write failed", Date.UTC(2026, 10, 9, 7, 14));
+
+    expect(log.toText()).toBe(
+      "2026-11-09T07:14:00.000Z  write failed  (2 times since 2026-10-26T06:20:00.000Z)",
+    );
+  });
+
+  it("reads entries saved before repeats were counted", () => {
+    const log = new SyncErrorLog(createStore([{ at: 5_000, message: "old" }]) as never);
+    log.load();
+
+    expect(log.list()).toEqual([{ at: 5_000, message: "old", firstAt: 5_000, count: 1 }]);
   });
 
   it("drops the oldest once it is full, rather than growing forever", () => {

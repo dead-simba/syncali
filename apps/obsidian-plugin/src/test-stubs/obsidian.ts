@@ -262,6 +262,8 @@ export class App {
   }
 }
 
+export const apiVersion = "1.15.0";
+
 export const Platform = {
   isDesktop: true,
   isMobile: false,

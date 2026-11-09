@@ -173,6 +173,22 @@ const en = {
     "conflicts.resolvedKeptOriginal": ({ path }: { path: string }) => `Kept your vault's version of "${path}". The copy is in the trash.`,
     "conflicts.resolvedKeptCopy": ({ path }: { path: string }) => `"${path}" now holds the copy's version. The old one is in the trash.`,
     "conflicts.fileMeta": ({ when, size }: { when: string; size: string }) => `Changed ${when} - ${size}`,
+    "devices.header": "Devices",
+    "devices.desc": "How each of your devices is syncing, from the report it sends every 10 minutes.",
+    "devices.view": "View devices",
+    "devices.modalDesc": "Each device sends a report every 10 minutes while Syncali is running. File names and error messages are encrypted on the device; your server sees only counts, versions and times.",
+    "devices.loading": "Asking your server...",
+    "devices.unavailable": "No device reports to show. They need sync to be connected, and a Syncali server new enough to keep them. Check that sync is running; if it is, update your server.",
+    "devices.none": "No device has sent a report yet. A device sends its first one a minute after sync connects.",
+    "devices.thisDevice": ({ label }: { label: string }) => `${label} (this device)`,
+    "devices.lastReport": ({ ago }: { ago: string }) => `last report ${ago} ago`,
+    "devices.unreadable": "Its report could not be read",
+    "devices.detailsUnreadable": ({ reason }: { reason: string }) => `This device's file names and errors could not be decrypted here: ${reason}`,
+    "devices.recentProblems": "Recent problems",
+    "devices.notYetSynced": ({ count }: { count: string }) => `Not in sync yet (${count})`,
+    "devices.state.waiting_to_upload": "waiting to upload",
+    "devices.state.not_downloaded": "not downloaded yet",
+    "devices.state.differs": "differs from the server",
     "problems.header": "Recent problems",
     "problems.desc": "The last 50 errors Syncali showed you, kept so you can read one after the notice has gone.",
     "problems.view": "View problems",
@@ -181,6 +197,7 @@ const en = {
     "problems.copied": "Copied to clipboard.",
     "problems.clear": "Clear",
     "problems.cleared": "Cleared.",
+    "problems.repeated": ({ count, since }: { count: string; since: string }) => `${count} times since ${since}`,
     "sync.label": "Sync",
     "sync.pathCollision": ({ path }: { path: string }) => `Sync path collision detected. The remote file was saved to "${path}".`,
     "sync.rollbackDetected": ({ path }: { path: string }) => `Sync server sent an outdated version of "${path}". It was ignored to avoid overwriting newer changes.`,
@@ -273,6 +290,7 @@ const en = {
     "error.serverUnavailable": ({ detail }: { detail: string }) =>
       `Your Syncali server could not handle a sync request (${detail}). Nothing was lost, and Syncali will try again on its own. If this keeps happening, check that your server is running.`,
     "error.autoSync": "Automatic sync failed",
+    "error.deviceReports": "Could not load device reports",
     "error.autoSyncInitialization": "Automatic sync initialization failed",
     "error.autoSyncResume": "Automatic sync could not resume",
     "error.hiddenFolderScan": "Hidden folder scan failed",
@@ -1259,6 +1277,7 @@ export type SynchLocale = keyof typeof messages;
 export type SynchMessageKey = keyof typeof messages.en;
 export type SynchErrorContextKey =
   | "error.autoSync"
+  | "error.deviceReports"
   | "error.autoSyncInitialization"
   | "error.autoSyncResume"
   | "error.hiddenFolderScan"
