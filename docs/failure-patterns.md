@@ -29,6 +29,8 @@ Where the numbers live:
 | Is the engine doing anything at all? | Size of that same `.log` sampled 30 seconds apart. Zero growth means idle |
 | What changed on disk and when? | `find . -newermt "-15 minutes"` in the vault |
 | What did the user actually see? | Settings → Recent problems, or `.obsidian/plugins/syncali/data.json` → `errorLog` |
+| Which devices are signed in, and when were they last used? | D1 `session`: `user_agent` (`Dalvik/… Android` is the phone; the string is fixed when the session is created, so an old Obsidian version there is not the current one) and `updated_at` |
+| When did Obsidian on the desktop see a file change? | Obsidian's File Recovery snapshots live in the same leveldb as `path` + `ts` (a V8 double after the bytes `tsN`) + `data`. They are taken on Obsidian's own vault events, so they date what plugins were told |
 
 A vault that is genuinely idle shows: no requests, no store growth, no file
 changes. If the UI disagrees with all three, the bug is in the UI's idea of the
@@ -59,6 +61,14 @@ the thing. These were all taken, and all misread:
 - **Declaring a fix without re-measuring.** 0.3.26 was shipped with "I'm not
   calling this fixed until I've seen that number", and the number was never
   taken. The loop was still running three weeks later.
+- **Reading Recent problems as a history.** The log collapses an immediate
+  repeat into one line and moves its time forward. One line dated 9 November,
+  after a gap of five weeks, was a failure that could not have started before
+  26 October and recurs on every pull: the time is the last occurrence, not
+  the first.
+- **A `wrangler tail` with the phone asleep.** Ten minutes, 41 events, none
+  from the phone. A capture only sees a device that is running; open Obsidian
+  on it for the duration.
 
 A capture worth trusting names the device (user-agent), the object (blob size
 is a fingerprint: a v2 envelope is the plaintext plus exactly 33 bytes), and
@@ -81,6 +91,17 @@ report it, keep going.
 **Still outstanding:** the apply phase in `pull-entry-state-applier.ts` is
 deliberately all-or-nothing, guarded by two rollback test suites. If it is ever
 changed, those suites are the specification.
+
+That makes any name this device cannot create fatal to the pull. A note named
+with a `:` stopped the phone's pull from 26 October, when it was uploaded, to
+at least 9 November: `write failed for "file:/Users/…": FILE_NOTCREATED`, the
+window rolled back, and the cursor never moved. Reproduced against the pull
+engine: cursor 0 on three attempts in a row, and nothing after the entry
+written. That instance
+is fixed upstream of the apply phase - the path is now classified as never
+synced, so the planner skips it and the cursor advances - but the general case
+is not: a desktop can still upload a real note named with `?`, `"`, `*`, `<`,
+`>`, `|` or `\`, and Android will stop on it the same way.
 
 ### A record that looks settled but never arrived
 
@@ -159,10 +180,39 @@ The reverse happened too. File-system errors carry the file's path, and a path
 is the user's own words: a note under `Offline maps/` matched the offline
 markers, so a file the OS would not hand over was retried on every push, with
 no count and no parking, and took the push down with it. Local file errors are
-now judged by their code before any text is matched.
+now judged by their code before any text is matched. Android's vault write
+errors had no code at all (`write failed for "…": FILE_NOTCREATED`), so they
+slipped past that check until 0.3.28; they are now local by construction.
 
 **Watch the request rate after shipping a retry change.** `npx wrangler tail`
 for a minute: an idle vault is a handful of requests, not hundreds.
+
+### One fix per decision, and every decision that reads the same strings
+
+0.3.27 taught the *retry* classifier Chromium's `net::ERR_…` spelling and left
+the *notice* classifier alone. Every Wi-Fi handover went on popping
+"Automatic sync failed: net::ERR_CONNECTION_RESET" over a drop the next pass
+retried anyway: 66 of the 82 problems recorded across two desktop vaults. The
+ones that needed a decision - a note set aside, a note that could not be read,
+an edit held back as stale, four conflicts - were buried among them. Counting Recent problems by kind is what found it - the log measures
+noise as well as failures.
+
+The obvious fix was wrong. `isOfflineLikeError` reads as "what the status
+says", but the push also uses it to decide whether to abandon the whole batch.
+Adding Chromium's codes to it would have turned one file that hits the same
+reset on every attempt into a push that never gets past it - uncounted, never
+set aside, behind a quiet "offline". The push-quarantine tests caught it. The
+notice now has its own predicate, `isConnectionDropError`, and the push's is
+unchanged.
+
+**Before widening a predicate, list every caller and what each one decides
+with it.** A name that describes one use is not a promise there are no others.
+
+**A named error must prove its cause.** "Android does not allow ? in file
+names" appears only when both the refusal code and a refused character are
+present; a FILE_NOTCREATED from a full disk keeps the generic text rather than
+blaming the name. "Syncali will try again on its own" appears only for
+automatic sync, because a server failure while creating a vault is not retried.
 
 ### The status disagreeing with reality
 
@@ -194,6 +244,15 @@ More bugs than any other single cause.
   marker mid-name.
 - Two devices can hold separate identities for one path. Identical bytes at one
   path are not a conflict and are now adopted rather than copied.
+- **A `TFile` is not necessarily in the vault.** Since 1.14, desktop Obsidian
+  can open a file from anywhere on disk as a `TExternalFile` (a `TFile`
+  subclass) with the path `file:` + its real location, and fires the vault's
+  own `modify` and `delete` events for it while it is open. The desktop
+  adapter strips `file:` and resolves the rest as an absolute path, so a write
+  or delete there reaches the real file. Previewing a draft from another
+  project while it was edited elsewhere uploaded it four times. Obsidian's own
+  test for these is `path.startsWith("file:")`; Syncali now uses the same one
+  and treats the path as never synced.
 
 ## This vault's known landmines
 
@@ -209,6 +268,28 @@ More bugs than any other single cause.
   desktop holds an edit based on revision 1 while the server is ahead, and it
   never received the newer revision. This is the note that looped. 0.3.27
   fetches it by id and merges, or sets it aside with the exact reason.
+- An entry at `file:/Users/alitahir/Documents/Development/Claude Code/Understanding-Quran-Words/…/behind/2026-10-19-alhamdulillah.md`,
+  uploaded by the desktop on 26 October while Obsidian had that file open for
+  preview. Still live on the server; devices with the `file:` rule skip it.
+  It stopped the phone's pull from then until the fix reached it.
+
+## Checks that fail for reasons outside the code
+
+Know these before reading a red result as a regression.
+
+- **`pnpm -C apps/api test:integration` fails on this machine before any test
+  runs**: `No such module ".../Claude%20Code/..."`. The Workers test runner
+  URL-encodes the space in the folder name `Claude Code`. CI is unaffected. To
+  run them locally, use a checkout whose path has no spaces
+  (`git worktree add --detach <path> HEAD`, `pnpm install --frozen-lockfile`)
+  and the placeholder values CI sets in `.github/workflows/api-ci.yml`
+  (`BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, `SYNC_TOKEN_SECRET`). On
+  9 November that ran 58 of 58.
+- **`pnpm -C apps/obsidian-plugin lint` reports about 61 problems, and CI does
+  not run it.** Most are Obsidian's popout-window rules (`window.setTimeout`)
+  and its warning about a hard-coded `.obsidian`, which the reserved-path
+  defaults use on purpose. Judge a change by the count before and after it
+  (`git stash`, lint, `git stash pop`), not by the total.
 
 ## Where things are recorded
 
